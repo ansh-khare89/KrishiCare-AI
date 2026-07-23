@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ScanSearch } from 'lucide-react'
+import { Loader2, ScanSearch, CloudSun, Droplet, Thermometer, Search, AlertCircle } from 'lucide-react'
 import heroImg from '../assets/hero.png'
 import ImageUpload from '../components/ImageUpload'
 import PredictionResult from '../components/PredictionResult'
 import { SkeletonResult } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
-import { predictCropHealth, predictBatch } from '../api/client'
+import { predictCropHealth, predictBatch, fetchWeatherAdvisory } from '../api/client'
 
 export default function HomePage() {
   const { push } = useToast()
@@ -18,6 +18,27 @@ export default function HomePage() {
   const [batchMode, setBatchMode] = useState(false)
   const [batchFiles, setBatchFiles] = useState([])
   const [batchResults, setBatchResults] = useState([])
+  const [weatherCity, setWeatherCity] = useState('New Delhi')
+  const [weatherInput, setWeatherInput] = useState('New Delhi')
+  const [weatherData, setWeatherData] = useState(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
+
+  const handleFetchWeather = async (cityToFetch = weatherInput) => {
+    setWeatherLoading(true)
+    try {
+      const data = await fetchWeatherAdvisory(cityToFetch)
+      setWeatherData(data)
+      setWeatherCity(data.city || cityToFetch)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setWeatherLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    handleFetchWeather('New Delhi')
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -107,6 +128,82 @@ export default function HomePage() {
             <img src={heroImg} alt="" className="max-h-64 w-auto drop-shadow-xl" />
           </div>
         </div>
+      </section>
+
+      {/* Weather Advisory Section */}
+      <section className="rounded-3xl border border-leaf-100/60 bg-white/60 p-6 shadow-sm backdrop-blur-md dark:border-earth-700 dark:bg-earth-900/50">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-earth-900 dark:text-earth-50 flex items-center gap-2">
+              <CloudSun className="h-6 w-6 text-leaf-600 dark:text-leaf-400" />
+              Live Agro-Weather Advisory
+            </h2>
+            <p className="text-sm text-earth-700/80 dark:text-earth-400">
+              Get disease risk alerts and watering advice based on your local weather.
+            </p>
+          </div>
+          <form 
+            onSubmit={(e) => { e.preventDefault(); handleFetchWeather(); }}
+            className="flex items-center gap-2 bg-white/80 dark:bg-earth-800 rounded-xl p-1 shadow-inner border border-leaf-100/50 dark:border-earth-700"
+          >
+            <input
+              type="text"
+              value={weatherInput}
+              onChange={(e) => setWeatherInput(e.target.value)}
+              placeholder="Enter city..."
+              className="bg-transparent px-3 py-1 text-sm text-earth-900 focus:outline-none dark:text-earth-50"
+            />
+            <button
+              type="submit"
+              disabled={weatherLoading}
+              className="rounded-lg bg-leaf-600 p-1.5 text-white shadow-md hover:bg-leaf-700 disabled:opacity-50 transition-colors"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+
+        {weatherLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-leaf-600" />
+          </div>
+        ) : weatherData ? (
+          <div className="grid gap-6 md:grid-cols-3 items-center">
+            <div className="md:col-span-2 flex flex-col justify-center rounded-2xl bg-leaf-50/50 p-5 dark:bg-leaf-950/20 border border-leaf-100/30 dark:border-earth-800">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-leaf-600 dark:text-leaf-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-leaf-800 dark:text-leaf-300 text-sm mb-1">
+                    Advisory for {weatherCity}
+                  </h4>
+                  <p className="text-sm text-earth-850 dark:text-earth-200 leading-relaxed font-medium">
+                    {weatherData.advisory || "No weather advisory returned."}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-around rounded-2xl border border-leaf-100/40 bg-earth-50/40 p-5 dark:border-earth-800 dark:bg-earth-800/30">
+              <div className="text-center">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400">
+                  <Thermometer className="h-5 w-5" />
+                </div>
+                <p className="mt-2 text-xs text-earth-700 dark:text-earth-450 font-medium">Weather condition</p>
+                <p className="text-lg font-bold text-earth-800 dark:text-earth-200 mt-0.5 capitalize">Live</p>
+              </div>
+              <div className="h-12 w-px bg-leaf-100 dark:bg-earth-800" />
+              <div className="text-center">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                  <Droplet className="h-5 w-5" />
+                </div>
+                <p className="mt-2 text-xs text-earth-700 dark:text-earth-450 font-medium">Watering Needs</p>
+                <p className="text-lg font-bold text-earth-800 dark:text-earth-200 mt-0.5">Optimized</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-earth-500 text-center py-4">Search a city to view crop safety tip.</p>
+        )}
       </section>
 
       <section className="rounded-3xl border border-leaf-100 bg-white/70 p-6 shadow-sm backdrop-blur dark:border-earth-700 dark:bg-earth-900/60 sm:p-8">

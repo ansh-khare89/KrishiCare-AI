@@ -47,4 +47,9 @@ export async function fetchHealth() {
   return data
 }
 
+export async function fetchWeatherAdvisory(city = 'New Delhi') {
+  const { data } = await api.get('/api/weather', { params: { city } })
+  return data
+}
+
 export default api
