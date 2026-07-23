@@ -1,0 +1,30 @@
+# Build outputs
+backend/target/
+frontend/dist/
+frontend/node_modules/
+
+# Python
+ml-service/venv/
+ml-service/__pycache__/
+**/__pycache__/
+*.pyc
+
+# ML artifacts & data
+ml-service/models/
+ml-service/dataset/
+*.h5
+
+# Runtime uploads
+uploads/
+backend/uploads/
+
+# IDE & OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local

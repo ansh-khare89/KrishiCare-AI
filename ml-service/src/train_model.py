@@ -1,5 +1,6 @@
 import os
 import json
+import argparse
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks
@@ -47,10 +48,8 @@ def build_model():
     # Input layer
     inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3), name="input_image")
     
-    # Apply data augmentation and normalization
+    # Apply data augmentation (preprocessing applied in dataset pipeline)
     x = data_augmentation(inputs)
-    # Preprocess inputs as required by MobileNetV2
-    x = layers.Lambda(tf.keras.applications.mobilenet_v2.preprocess_input, name="mobilenetv2_preprocess")(x)
     
     # Extract features using base model in inference mode
     x = base_model(x, training=False)
@@ -104,6 +103,20 @@ def plot_history(history):
     plt.close()
 
 def main():
+    parser = argparse.ArgumentParser(description="Train KrishiCare MobileNetV2 model")
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Faster training (8 epochs, batch 16) for local dev setup",
+    )
+    args = parser.parse_args()
+
+    global BATCH_SIZE, EPOCHS
+    if args.quick:
+        BATCH_SIZE = 16
+        EPOCHS = 8
+        print("Quick mode: 8 epochs, batch size 16")
+
     print("Setting up dataset directories...")
     setup_directories()
 
@@ -154,6 +167,15 @@ def main():
     with open('src/class_names.json', 'w') as f:
         json.dump(class_names, f, indent=4)
     print("Saved class names to src/class_names.json")
+
+    def preprocess_batch(images, labels):
+        images = tf.cast(images, tf.float32)
+        images = tf.keras.applications.mobilenet_v2.preprocess_input(images)
+        return images, labels
+
+    train_ds = train_ds.map(preprocess_batch)
+    val_ds = val_ds.map(preprocess_batch)
+    test_ds = test_ds.map(preprocess_batch)
 
     # Prefetch for performance optimization
     AUTOTUNE = tf.data.AUTOTUNE

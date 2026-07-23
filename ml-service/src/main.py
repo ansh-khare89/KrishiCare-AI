@@ -1,6 +1,7 @@
 import os
 import io
 import json
+import asyncio
 import numpy as np
 import tensorflow as tf
 from PIL import Image
@@ -8,7 +9,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-# Global references for model and classification names
+MODEL_VERSION = "mobilenetv2-v1"
+MODEL_PATH = 'models/krishicare_mobilenetv2.h5'
+CLASS_NAMES_PATH = 'src/class_names.json'
+
 model = None
 class_names = None
 
@@ -25,12 +29,15 @@ def make_readable(class_name):
 async def lifespan(app: FastAPI):
     """Pre-load ML model and class labels at application startup."""
     global model, class_names
-    model_path = 'models/krishicare_mobilenetv2.h5'
-    class_names_path = 'src/class_names.json'
-    
+    model_path = MODEL_PATH
+    class_names_path = CLASS_NAMES_PATH
     if os.path.exists(model_path):
         print("Loading trained MobileNetV2 model...")
-        model = tf.keras.models.load_model(model_path)
+        model = tf.keras.models.load_model(
+            model_path,
+            compile=False,
+            safe_mode=False,
+        )
     else:
         print(f"Warning: Model not found at '{model_path}'. Prediction endpoint will be disabled.")
         
@@ -51,7 +58,7 @@ app = FastAPI(
 # Enable CORS to allow internal Spring Boot API requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8080"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,21 +70,51 @@ def health_check():
     return {
         "status": "healthy",
         "service": "KrishiCare AI ML Service",
-        "model_loaded": model is not None
+        "model_loaded": model is not None,
+        "model_version": MODEL_VERSION
     }
 
+def run_inference(img_batch, class_idx=None, explain=False):
+    predictions = model.predict(img_batch, verbose=0)
+    score = predictions[0]
+    top_indices = np.argsort(score)[::-1][:3]
+
+    top_predictions = []
+    for idx in top_indices:
+        raw = class_names[int(idx)]
+        top_predictions.append({
+            "class": raw,
+            "readable_class": make_readable(raw),
+            "confidence": round(float(score[idx] * 100), 2)
+        })
+
+    best = top_predictions[0]
+    result = {
+        "class": best["class"],
+        "readable_class": best["readable_class"],
+        "confidence": best["confidence"],
+        "model_version": MODEL_VERSION,
+        "top_predictions": top_predictions
+    }
+
+    if explain:
+        from src.gradcam import generate_gradcam_overlay
+        idx = class_idx if class_idx is not None else int(top_indices[0])
+        heatmap = generate_gradcam_overlay(model, img_batch, idx)
+        if heatmap:
+            result["heatmap_base64"] = heatmap
+
+    return result
+
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)):
+async def predict(file: UploadFile = File(...), explain: bool = False):
     """Perform crop disease prediction on uploaded leaf image."""
     global model, class_names
     
-    # Reload model on-the-fly if it was trained post-startup
     if model is None or class_names is None:
-        model_path = 'models/krishicare_mobilenetv2.h5'
-        class_names_path = 'src/class_names.json'
-        if os.path.exists(model_path) and os.path.exists(class_names_path):
-            model = tf.keras.models.load_model(model_path)
-            with open(class_names_path, 'r') as f:
+        if os.path.exists(MODEL_PATH) and os.path.exists(CLASS_NAMES_PATH):
+            model = tf.keras.models.load_model(MODEL_PATH, compile=False, safe_mode=False)
+            with open(CLASS_NAMES_PATH, 'r') as f:
                 class_names = json.load(f)
         else:
             raise HTTPException(
@@ -85,35 +122,19 @@ async def predict(file: UploadFile = File(...)):
                 detail="ML model is not loaded. Please train the model before requesting predictions."
             )
 
-    # Validate file type
-    if not file.content_type.startswith("image/"):
+    if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
 
     try:
-        # Load and convert image to RGB
         contents = await file.read()
         img = Image.open(io.BytesIO(contents)).convert('RGB')
-        
-        # Resize to MobileNetV2 input dimensions
         img_resized = img.resize((224, 224))
-        img_array = np.array(img_resized)
+        img_array = np.array(img_resized, dtype=np.float32)
+        img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
         img_batch = np.expand_dims(img_array, axis=0)
 
-        # Run inference
-        predictions = model.predict(img_batch, verbose=0)
-        score = predictions[0]
-        predicted_class_idx = np.argmax(score)
-        
-        # Format prediction results
-        raw_class_name = class_names[predicted_class_idx]
-        readable_name = make_readable(raw_class_name)
-        confidence = float(score[predicted_class_idx] * 100)
-
-        return {
-            "class": raw_class_name,
-            "readable_class": readable_name,
-            "confidence": round(confidence, 2)
-        }
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, lambda: run_inference(img_batch, explain=explain))
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")

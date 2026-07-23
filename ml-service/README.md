@@ -92,21 +92,25 @@ pip install -r requirements.txt
 
 ## Training and Testing Workflows
 
-### Step 1: Pre-populate the Dataset
-Place your training, validation, and test images into their respective folders inside `ml-service/dataset/` under the following internal naming conventions:
-* `Tomato___healthy`
-* `Tomato___Early_blight`
-* `Tomato___Late_blight`
-* `Potato___healthy`
-* `Potato___Early_blight`
-* `Potato___Late_blight`
+### Step 1: Download the dataset (automated)
 
-*Note: Running the training script once will automatically create these folders for you if they are missing!*
+```powershell
+python src/download_dataset.py --max-per-class 80
+```
+
+This fetches tomato & potato leaf images from PlantVillage (via Hugging Face index + GitHub) and splits them into `dataset/train`, `dataset/val`, and `dataset/test`.
 
 ### Step 2: Train the Model
 Run the model training pipeline:
 ```powershell
-python src/train_model.py
+python src/train_model.py --quick   # fast dev training (~8 epochs)
+python src/train_model.py           # full training (20 epochs)
+```
+
+**Start inference server:**
+
+```powershell
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 This script will:
 1. Load and parse the images from `dataset/`.
