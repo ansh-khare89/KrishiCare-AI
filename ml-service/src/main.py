@@ -58,15 +58,20 @@ app = FastAPI(
 # Enable CORS to allow internal Spring Boot API requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8080"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+        "https://krishi-care-ai.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 @app.get("/")
+@app.get("/health")
 def health_check():
-    """Verify service health and model initialization status."""
     return {
         "status": "healthy",
         "service": "KrishiCare AI ML Service",
