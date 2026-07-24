@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-MODEL_VERSION = "mobilenetv2-v1"
+MODEL_VERSION = "mobilenetv2-v2"
 MODEL_PATH = 'models/krishicare_mobilenetv2.h5'
 CLASS_NAMES_PATH = 'src/class_names.json'
 

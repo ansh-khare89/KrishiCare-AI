@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: krishicare-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: ML_SERVICE_URL
+        value: https://krishicare-ml.onrender.com
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: krishicare-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: krishicare-db
+          property: username
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: krishicare-db
+          property: password
+      - key: STORAGE_TYPE
+        value: local
+      - key: WEATHER_API_KEY
+        sync: false
+
+  - type: web
+    name: krishicare-ml
+    runtime: docker
+    dockerfilePath: ml-service/Dockerfile
+    dockerContext: ml-service
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+
+databases:
+  - name: krishicare-db
+    databaseName: krishicare
+    user: krishicare_user
+    plan: free

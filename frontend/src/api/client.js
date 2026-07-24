@@ -4,7 +4,32 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
   headers: { Accept: 'application/json' },
   withCredentials: true,
+  timeout: 30000, // 30 second timeout
 })
+
+// Add request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.params || '')
+    return config
+  },
+  (error) => {
+    console.error('API Request Error:', error)
+    return Promise.reject(error)
+  }
+)
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => {
+    console.log(`API Response: ${response.config.url} - Status: ${response.status}`)
+    return response
+  },
+  (error) => {
+    console.error('API Response Error:', error.response?.status, error.config?.url, error.message)
+    return Promise.reject(error)
+  }
+)
 
 export function resolveImageUrl(url) {
   if (!url) return ''

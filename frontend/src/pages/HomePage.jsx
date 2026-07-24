@@ -121,7 +121,7 @@ export default function HomePage() {
               Spot leaf disease in seconds
             </h1>
             <p className="mt-4 text-lg text-earth-700/80 dark:text-earth-300">
-              Upload a tomato or potato leaf. Get disease ID, confidence, and farming advice.
+              Upload leaf images from 30+ crops including tomato, potato, corn, apple, grape, and more. Get disease ID, confidence, and farming advice.
             </p>
           </div>
           <div className="flex justify-center">

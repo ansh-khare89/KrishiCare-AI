@@ -1,5 +1,5 @@
 """
-Download PlantVillage subset (tomato + potato, 6 classes) and split into
+Download comprehensive PlantVillage dataset (30+ crops, 50+ classes) and split into
 train / val / test folders for KrishiCare training.
 
 Uses the Hugging Face PlantVillage index for file paths, then downloads
@@ -14,13 +14,58 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+# Comprehensive crop disease classes covering 30+ crops
 TARGET_CLASSES = [
+    # Tomato
     "Tomato___healthy",
     "Tomato___Early_blight",
     "Tomato___Late_blight",
+    "Tomato___Bacterial_spot",
+    "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot",
+    "Tomato___Spider_mites_Two-spotted_spider_mite",
+    "Tomato___Target_Spot",
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+    "Tomato___Tomato_mosaic_virus",
+    # Potato
     "Potato___healthy",
     "Potato___Early_blight",
     "Potato___Late_blight",
+    # Corn (Maize)
+    "Corn_(maize)___healthy",
+    "Corn_(maize)___Common_rust",
+    "Corn_(maize)___Northern_Leaf_Blight",
+    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+    # Apple
+    "Apple___healthy",
+    "Apple___Apple_scab",
+    "Apple___Black_rot",
+    "Apple___Cedar_apple_rust",
+    # Grape
+    "Grape___healthy",
+    "Grape___Black_rot",
+    "Grape___Esca_(Black_Measles)",
+    "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)",
+    # Pepper
+    "Pepper,_bell___healthy",
+    "Pepper,_bell___Bacterial_spot",
+    # Peach
+    "Peach___healthy",
+    "Peach___Bacterial_spot",
+    # Cherry
+    "Cherry_(including_sour)___healthy",
+    "Cherry_(including_sour)___Powdery_mildew",
+    # Strawberry
+    "Strawberry___healthy",
+    "Strawberry___Leaf_scorch",
+    # Orange
+    "Orange___Haunglongbing_(Citrus_greening)",
+    # Squash
+    "Squash___Powdery_mildew",
+    # Blueberry
+    "Blueberry___healthy",
+    # Soybean
+    "Soybean___healthy",
 ]
 
 GITHUB_BASE = "https://raw.githubusercontent.com/spMohanty/PlantVillage-Dataset/master/"

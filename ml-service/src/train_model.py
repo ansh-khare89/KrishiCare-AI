@@ -4,23 +4,53 @@ import argparse
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks
+import numpy as np
 
 # Configuration constants
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
-EPOCHS = 20
-NUM_CLASSES = 6
+EPOCHS = 30
+NUM_CLASSES = 38  # Updated to support 38 classes
 
 def setup_directories():
     """Ensure necessary directories exist and create the expected structure."""
     os.makedirs('models', exist_ok=True)
     os.makedirs('src', exist_ok=True)
     
-    # Dataset subfolders mapping
+    # Dataset subfolders mapping - comprehensive 38 classes
     dataset_dirs = ['dataset/train', 'dataset/val', 'dataset/test']
     classes = [
+        # Tomato (10 classes)
         'Tomato___healthy', 'Tomato___Early_blight', 'Tomato___Late_blight',
-        'Potato___healthy', 'Potato___Early_blight', 'Potato___Late_blight'
+        'Tomato___Bacterial_spot', 'Tomato___Leaf_Mold', 'Tomato___Septoria_leaf_spot',
+        'Tomato___Spider_mites_Two-spotted_spider_mite', 'Tomato___Target_Spot',
+        'Tomato___Tomato_Yellow_Leaf_Curl_Virus', 'Tomato___Tomato_mosaic_virus',
+        # Potato (3 classes)
+        'Potato___healthy', 'Potato___Early_blight', 'Potato___Late_blight',
+        # Corn (4 classes)
+        'Corn_(maize)___healthy', 'Corn_(maize)___Common_rust',
+        'Corn_(maize)___Northern_Leaf_Blight', 'Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot',
+        # Apple (4 classes)
+        'Apple___healthy', 'Apple___Apple_scab', 'Apple___Black_rot', 'Apple___Cedar_apple_rust',
+        # Grape (4 classes)
+        'Grape___healthy', 'Grape___Black_rot', 'Grape___Esca_(Black_Measles)',
+        'Grape___Leaf_blight_(Isariopsis_Leaf_Spot)',
+        # Pepper (2 classes)
+        'Pepper,_bell___healthy', 'Pepper,_bell___Bacterial_spot',
+        # Peach (2 classes)
+        'Peach___healthy', 'Peach___Bacterial_spot',
+        # Cherry (2 classes)
+        'Cherry_(including_sour)___healthy', 'Cherry_(including_sour)___Powdery_mildew',
+        # Strawberry (2 classes)
+        'Strawberry___healthy', 'Strawberry___Leaf_scorch',
+        # Orange (1 class)
+        'Orange___Haunglongbing_(Citrus_greening)',
+        # Squash (1 class)
+        'Squash___Powdery_mildew',
+        # Blueberry (1 class)
+        'Blueberry___healthy',
+        # Soybean (1 class)
+        'Soybean___healthy',
     ]
     
     for base_dir in dataset_dirs:
@@ -28,13 +58,15 @@ def setup_directories():
             os.makedirs(os.path.join(base_dir, cls), exist_ok=True)
 
 def build_model():
-    """Build the transfer learning model based on MobileNetV2."""
-    # Data Augmentation pipeline to prevent overfitting
+    """Build the transfer learning model based on MobileNetV2 with improved architecture."""
+    # Enhanced Data Augmentation pipeline to prevent overfitting
     data_augmentation = models.Sequential([
         layers.RandomFlip("horizontal_and_vertical"),
-        layers.RandomRotation(0.2),
-        layers.RandomZoom(0.2),
-        layers.RandomContrast(0.2)
+        layers.RandomRotation(0.3),
+        layers.RandomZoom(0.3),
+        layers.RandomContrast(0.3),
+        layers.RandomTranslation(0.1, 0.1),
+        layers.RandomBrightness(0.2)
     ], name="data_augmentation")
 
     # Load pre-trained MobileNetV2 base model with ImageNet weights
@@ -43,28 +75,32 @@ def build_model():
         include_top=False,
         weights='imagenet'
     )
-    base_model.trainable = False  # Freeze pre-trained weights
+    base_model.trainable = False  # Freeze pre-trained weights initially
 
     # Input layer
     inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3), name="input_image")
     
-    # Apply data augmentation (preprocessing applied in dataset pipeline)
+    # Apply data augmentation
     x = data_augmentation(inputs)
     
     # Extract features using base model in inference mode
     x = base_model(x, training=False)
     
-    # Classification head
+    # Enhanced classification head with better regularization
     x = layers.GlobalAveragePooling2D(name="global_pooling")(x)
-    x = layers.Dropout(0.2, name="dropout")(x)
+    x = layers.BatchNormalization(name="batch_norm")(x)
+    x = layers.Dropout(0.3, name="dropout1")(x)
+    x = layers.Dense(512, activation='relu', name="fc1")(x)
+    x = layers.BatchNormalization(name="batch_norm2")(x)
+    x = layers.Dropout(0.2, name="dropout2")(x)
     outputs = layers.Dense(NUM_CLASSES, activation='softmax', name="classifier")(x)
     
-    model = models.Model(inputs, outputs, name="KrishiCare_MobileNetV2")
+    model = models.Model(inputs, outputs, name="KrishiCare_MobileNetV2_Enhanced")
     
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
         loss='categorical_crossentropy',
-        metrics=['accuracy']
+        metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_accuracy')]
     )
     return model
 
@@ -155,8 +191,12 @@ def main():
         print("  ml-service/dataset/val/")
         print("  ml-service/dataset/test/")
         print("\nUnder each folder, ensure images are in class directories:")
-        print("  Tomato___healthy, Tomato___Early_blight, Tomato___Late_blight")
+        print("  Tomato___healthy, Tomato___Early_blight, Tomato___Late_blight, etc.")
         print("  Potato___healthy, Potato___Early_blight, Potato___Late_blight")
+        print("  Corn_(maize)___healthy, Corn_(maize)___Common_rust, etc.")
+        print("  Apple___healthy, Apple___Apple_scab, etc.")
+        print("  (38 classes total covering 30+ crops)")
+        print("\nOr run: python src/download_dataset.py --max-per-class 200")
         print("\nThen run this training script again.")
         print("="*70 + "\n")
         return
