@@ -1,0 +1,122 @@
+Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< com.krishicare:backend >-----------------------
+[INFO] Building backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ backend ---
+[INFO] Deleting C:\KrishiCare-AI\backend\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ backend ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 39 source files with javac [debug parameters release 21] to target\classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ backend ---
+[INFO] skip non existing resourceDirectory C:\KrishiCare-AI\backend\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ backend ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 1 source file with javac [debug parameters release 21] to target\test-classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+[INFO] Running com.krishicare.backend.HealthControllerIntegrationTest
+16:08:02.443 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.krishicare.backend.HealthControllerIntegrationTest]: HealthControllerIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+16:08:02.652 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.krishicare.backend.BackendApplication for test class com.krishicare.backend.HealthControllerIntegrationTest
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.0)
+
+2026-07-24T16:08:03.506+05:30  INFO 28560 --- [           main] c.k.b.HealthControllerIntegrationTest    : Starting HealthControllerIntegrationTest using Java 21.0.7 with PID 28560 (started by anshk in C:\KrishiCare-AI\backend)
+2026-07-24T16:08:03.508+05:30  INFO 28560 --- [           main] c.k.b.HealthControllerIntegrationTest    : The following 1 profile is active: "dev"
+2026-07-24T16:08:05.868+05:30  INFO 28560 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-07-24T16:08:05.985+05:30  INFO 28560 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 95 ms. Found 2 JPA repository interfaces.
+2026-07-24T16:08:07.613+05:30  INFO 28560 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-07-24T16:08:08.013+05:30  INFO 28560 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:krishicare user=SA
+2026-07-24T16:08:08.017+05:30  INFO 28560 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-07-24T16:08:08.109+05:30  INFO 28560 --- [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:h2:mem:krishicare (H2 2.2)
+2026-07-24T16:08:08.122+05:30  WARN 28560 --- [           main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: H2 2.2.224 is newer than this version of Flyway and support has not been tested. The latest supported version of H2 is 2.2.220.
+2026-07-24T16:08:08.196+05:30  INFO 28560 --- [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Schema history table "PUBLIC"."flyway_schema_history" does not exist yet
+2026-07-24T16:08:08.200+05:30  INFO 28560 --- [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.051s)
+2026-07-24T16:08:08.214+05:30  INFO 28560 --- [           main] o.f.c.i.s.JdbcTableSchemaHistory         : Creating Schema History table "PUBLIC"."flyway_schema_history" ...
+2026-07-24T16:08:08.280+05:30  INFO 28560 --- [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "PUBLIC": << Empty Schema >>
+2026-07-24T16:08:08.290+05:30  INFO 28560 --- [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "PUBLIC" to version "1 - init"
+2026-07-24T16:08:08.326+05:30  INFO 28560 --- [           main] o.f.core.internal.command.DbMigrate      : Migrating schema "PUBLIC" to version "2 - create users table"
+2026-07-24T16:08:08.340+05:30  INFO 28560 --- [           main] o.f.core.internal.command.DbMigrate      : Successfully applied 2 migrations to schema "PUBLIC", now at version v2 (execution time 00:00.022s)
+2026-07-24T16:08:08.594+05:30  INFO 28560 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-07-24T16:08:08.751+05:30  INFO 28560 --- [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.2.Final
+2026-07-24T16:08:08.824+05:30  INFO 28560 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-07-24T16:08:09.475+05:30  INFO 28560 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-07-24T16:08:09.565+05:30  WARN 28560 --- [           main] org.hibernate.orm.deprecation            : HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-07-24T16:08:11.230+05:30  INFO 28560 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-07-24T16:08:11.278+05:30  INFO 28560 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-07-24T16:08:12.612+05:30  INFO 28560 --- [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-07-24T16:08:14.074+05:30  WARN 28560 --- [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-07-24T16:08:14.194+05:30  WARN 28560 --- [           main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: b711b6c9-78ed-4e71-9428-b6d20c9c4806
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-07-24T16:08:14.225+05:30  INFO 28560 --- [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-07-24T16:08:15.437+05:30  INFO 28560 --- [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 2 endpoints beneath base path '/actuator'
+2026-07-24T16:08:15.604+05:30  INFO 28560 --- [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@52ed42d6, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@5cf3924c, org.springframework.security.web.context.SecurityContextHolderFilter@30336205, org.springframework.security.web.header.HeaderWriterFilter@57e9dd1f, org.springframework.web.filter.CorsFilter@5a0ec54c, org.springframework.security.web.authentication.logout.LogoutFilter@3d6fe206, com.krishicare.backend.config.JwtAuthFilter@27b7913, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@1579cf25, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@8afd00e, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@486d9e4e, org.springframework.security.web.session.SessionManagementFilter@5d8c9945, org.springframework.security.web.access.ExceptionTranslationFilter@29c3dd33, org.springframework.security.web.access.intercept.AuthorizationFilter@4acbe932]
+2026-07-24T16:08:17.974+05:30  INFO 28560 --- [           main] o.s.b.a.h2.H2ConsoleAutoConfiguration    : H2 console available at '/h2-console'. Database available at 'jdbc:h2:mem:krishicare'
+2026-07-24T16:08:18.115+05:30  INFO 28560 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-07-24T16:08:18.115+05:30  INFO 28560 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-07-24T16:08:18.118+05:30  INFO 28560 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 3 ms
+2026-07-24T16:08:18.411+05:30  INFO 28560 --- [           main] c.k.b.HealthControllerIntegrationTest    : Started HealthControllerIntegrationTest in 15.473 seconds (process running for 17.317)
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (C:\Users\anshk\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.16\byte-buddy-agent-1.14.16.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 18.97 s -- in com.krishicare.backend.HealthControllerIntegrationTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jar:3.4.1:jar (default-jar) @ backend ---
+[INFO] Building jar: C:\KrishiCare-AI\backend\target\backend-0.0.1-SNAPSHOT.jar
+[INFO] 
+[INFO] --- spring-boot:3.3.0:repackage (repackage) @ backend ---
+[INFO] Replacing main artifact C:\KrishiCare-AI\backend\target\backend-0.0.1-SNAPSHOT.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to C:\KrishiCare-AI\backend\target\backend-0.0.1-SNAPSHOT.jar.original
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  34.857 s
+[INFO] Finished at: 2026-07-24T16:08:25+05:30
+[INFO] ------------------------------------------------------------------------
