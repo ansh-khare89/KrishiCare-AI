@@ -20,6 +20,7 @@ public class WeatherService {
 
         try {
             if (apiKey == null || apiKey.isBlank()) {
+                System.out.println("Weather API key not configured, using mock data for city: " + city);
                 return mockTip(city);
             }
 
@@ -30,7 +31,10 @@ public class WeatherService {
                     .retrieve()
                     .body(Map.class);
 
-            if (data == null) return "";
+            if (data == null) {
+                System.out.println("Weather API returned null data for city: " + city);
+                return mockTip(city);
+            }
 
             @SuppressWarnings("unchecked")
             Map<String, Object> main = (Map<String, Object>) data.get("main");
@@ -43,8 +47,10 @@ public class WeatherService {
                     ? String.valueOf(((Map<?, ?>) weatherList.get(0)).get("main"))
                     : "Unknown";
 
+            System.out.println("Weather data retrieved for " + city + ": " + condition + ", " + temp + "°C, " + humidity + "%");
             return buildTip(city, condition, temp, humidity);
         } catch (Exception e) {
+            System.out.println("Weather API failed for city " + city + ": " + e.getMessage() + ", using mock data");
             return mockTip(city);
         }
     }

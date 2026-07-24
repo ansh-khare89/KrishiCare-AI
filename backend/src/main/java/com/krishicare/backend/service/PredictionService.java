@@ -92,7 +92,30 @@ public class PredictionService {
 
     private String resolveCropName(String rawClass) {
         if (rawClass == null) return "Unknown";
-        return rawClass.toLowerCase().contains("tomato") ? "Tomato" : "Potato";
+        
+        // Extract crop name from class name (format: "Crop___disease" or "Crop___healthy")
+        String[] parts = rawClass.split("___");
+        if (parts.length > 0) {
+            String cropName = parts[0].trim();
+            // Clean up special characters and format nicely
+            cropName = cropName.replace("_", " ")
+                               .replace("(maize)", "Corn")
+                               .replace("(including_sour)", "")
+                               .replace(",_bell", "")
+                               .trim();
+            // Capitalize first letter of each word
+            String[] words = cropName.split("\\s+");
+            StringBuilder formatted = new StringBuilder();
+            for (String word : words) {
+                if (!word.isEmpty()) {
+                    formatted.append(Character.toUpperCase(word.charAt(0)))
+                            .append(word.substring(1).toLowerCase())
+                            .append(" ");
+                }
+            }
+            return formatted.toString().trim();
+        }
+        return "Unknown";
     }
 
     @SuppressWarnings("unchecked")

@@ -31,9 +31,11 @@ public class HealthController {
             if (mlHealth != null) {
                 mlStatus = String.valueOf(mlHealth.getOrDefault("status", "unknown"));
                 mlReady = Boolean.TRUE.equals(mlHealth.get("model_loaded"));
+                System.out.println("ML Service Health Check: status=" + mlStatus + ", modelLoaded=" + mlReady);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             mlStatus = "unreachable";
+            System.out.println("ML Service Health Check Failed: " + e.getMessage() + ", URL: " + mlServiceUrl);
         }
 
         return ResponseEntity.ok(Map.of(
