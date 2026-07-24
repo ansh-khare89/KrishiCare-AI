@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
-import api from '../api/client'
+import { Activity, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
+import { fetchHealth, wakeUpService } from '../api/client'
 
 export default function ServiceStatus() {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [wakingUp, setWakingUp] = useState(false)
 
   useEffect(() => {
     let active = true
 
     const check = async () => {
       try {
-        const { data } = await api.get('/api/health')
+        const data = await fetchHealth()
         if (active) setStatus(data)
       } catch {
         if (active) setStatus({ status: 'unreachable' })
@@ -22,11 +23,33 @@ export default function ServiceStatus() {
 
     check()
     const interval = setInterval(check, 30000)
+    
+    // Keep-alive ping every 4 minutes to prevent Render sleep
+    const keepAlive = setInterval(async () => {
+      if (active) {
+        await wakeUpService()
+      }
+    }, 240000)
+
     return () => {
       active = false
       clearInterval(interval)
+      clearInterval(keepAlive)
     }
   }, [])
+
+  const handleWakeUp = async () => {
+    setWakingUp(true)
+    await wakeUpService()
+    // Re-check health after wake-up
+    try {
+      const data = await fetchHealth()
+      setStatus(data)
+    } catch {
+      setStatus({ status: 'unreachable' })
+    }
+    setWakingUp(false)
+  }
 
   if (loading) {
     return (
@@ -39,6 +62,7 @@ export default function ServiceStatus() {
 
   const mlReady = status?.mlService?.modelLoaded
   const backendOk = status?.status === 'healthy'
+  const mlStatus = status?.mlService?.status
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-leaf-100 bg-white/80 px-4 py-2 text-sm">
@@ -58,8 +82,22 @@ export default function ServiceStatus() {
         ) : (
           <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
         )}
-        ML model {mlReady ? 'ready' : 'not trained'}
+        ML model {mlReady ? 'ready' : mlStatus === 'unreachable' ? 'waking up...' : 'not trained'}
       </span>
+      {!backendOk && (
+        <button
+          onClick={handleWakeUp}
+          disabled={wakingUp}
+          className="ml-2 flex items-center gap-1 rounded-lg bg-leaf-100 px-2 py-1 text-xs font-medium text-leaf-700 hover:bg-leaf-200 disabled:opacity-50"
+        >
+          {wakingUp ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3 w-3" />
+          )}
+          Wake Up
+        </button>
+      )}
     </div>
   )
 }

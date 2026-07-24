@@ -23,15 +23,25 @@ public class HealthController {
         String mlStatus = "unreachable";
 
         try {
+            // Try ping endpoint first (lighter weight)
             @SuppressWarnings("unchecked")
-            Map<String, Object> mlHealth = restClient.get()
-                    .uri(mlServiceUrl + "/")
+            Map<String, Object> pingResponse = restClient.get()
+                    .uri(mlServiceUrl + "/ping")
                     .retrieve()
                     .body(Map.class);
-            if (mlHealth != null) {
-                mlStatus = String.valueOf(mlHealth.getOrDefault("status", "unknown"));
-                mlReady = Boolean.TRUE.equals(mlHealth.get("model_loaded"));
-                System.out.println("ML Service Health Check: status=" + mlStatus + ", modelLoaded=" + mlReady);
+            
+            if (pingResponse != null && "pong".equals(pingResponse.get("status"))) {
+                mlStatus = "healthy";
+                // Now check if model is loaded
+                @SuppressWarnings("unchecked")
+                Map<String, Object> mlHealth = restClient.get()
+                        .uri(mlServiceUrl + "/")
+                        .retrieve()
+                        .body(Map.class);
+                if (mlHealth != null) {
+                    mlReady = Boolean.TRUE.equals(mlHealth.get("model_loaded"));
+                    System.out.println("ML Service Health Check: status=" + mlStatus + ", modelLoaded=" + mlReady);
+                }
             }
         } catch (Exception e) {
             mlStatus = "unreachable";
@@ -46,6 +56,16 @@ public class HealthController {
                         "modelLoaded", mlReady,
                         "url", mlServiceUrl
                 )
+        ));
+    }
+
+    @GetMapping("/ping")
+    public ResponseEntity<Map<String, String>> ping() {
+        // Lightweight endpoint for keep-alive pings to prevent Render sleep
+        return ResponseEntity.ok(Map.of(
+                "status", "pong",
+                "service", "KrishiCare Backend",
+                "timestamp", java.time.Instant.now().toString()
         ));
     }
 }

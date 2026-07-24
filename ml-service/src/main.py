@@ -79,6 +79,15 @@ def health_check():
         "model_version": MODEL_VERSION
     }
 
+@app.get("/ping")
+def ping():
+    """Lightweight endpoint for keep-alive pings to prevent Render sleep."""
+    return {
+        "status": "pong",
+        "service": "KrishiCare AI ML Service",
+        "timestamp": str(asyncio.get_event_loop().time())
+    }
+
 def run_inference(img_batch, class_idx=None, explain=False):
     predictions = model.predict(img_batch, verbose=0)
     score = predictions[0]

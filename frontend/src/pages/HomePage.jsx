@@ -30,7 +30,14 @@ export default function HomePage() {
       setWeatherData(data)
       setWeatherCity(data.city || cityToFetch)
     } catch (err) {
-      console.error(err)
+      console.error('Weather fetch error:', err)
+      // Show fallback message but don't block the UI
+      setWeatherData({ 
+        city: cityToFetch, 
+        advisory: 'Weather service temporarily unavailable. Using default advisory.',
+        temperature: '--',
+        humidity: '--'
+      })
     } finally {
       setWeatherLoading(false)
     }
@@ -74,9 +81,9 @@ export default function HomePage() {
         setBatchResults(data)
         push(`Analyzed ${data.length} images`, 'success')
       } catch (err) {
-        const message = err.response?.data?.message || 'Batch failed.'
+        const message = err.response?.data?.message || err.message || 'Batch failed. Please check if services are running.'
         setError(message)
-        push('Batch failed', 'error')
+        push('Batch failed. Try clicking "Wake Up" in the service status.', 'error')
       } finally {
         setLoading(false)
       }
@@ -98,9 +105,9 @@ export default function HomePage() {
         err.response?.data?.message ||
         err.response?.data ||
         err.message ||
-        'Something went wrong. Check that backend and ML service are up.'
+        'Prediction failed. Please check if services are running and try again.'
       setError(typeof message === 'string' ? message : 'Unexpected error.')
-      push('Prediction failed', 'error')
+      push('Prediction failed. Try clicking "Wake Up" in the service status.', 'error')
     } finally {
       setLoading(false)
     }
