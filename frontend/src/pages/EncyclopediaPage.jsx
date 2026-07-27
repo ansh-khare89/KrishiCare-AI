@@ -6,7 +6,7 @@ export default function EncyclopediaPage() {
       <div>
         <h1 className="text-3xl font-bold text-earth-900 dark:text-earth-50">Disease guide</h1>
         <p className="mt-2 text-earth-600 dark:text-earth-400">
-          Quick reference for tomato and potato leaf diseases.
+          Quick reference for 30+ crop diseases including tomato, potato, corn, apple, grape, and more.
         </p>
       </div>
 

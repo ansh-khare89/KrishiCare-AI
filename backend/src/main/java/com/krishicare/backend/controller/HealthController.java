@@ -55,7 +55,8 @@ public class HealthController {
                         "status", mlStatus,
                         "modelLoaded", mlReady,
                         "url", mlServiceUrl
-                )
+                ),
+                "message", mlReady ? "All systems operational" : "ML service needs attention - model may need retraining"
         ));
     }
 

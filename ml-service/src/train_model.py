@@ -10,7 +10,7 @@ import numpy as np
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
 EPOCHS = 30
-NUM_CLASSES = 38  # Updated to support 38 classes
+NUM_CLASSES = 38  # Will be updated dynamically based on available classes
 
 def setup_directories():
     """Ensure necessary directories exist and create the expected structure."""
@@ -181,6 +181,16 @@ def main():
             batch_size=BATCH_SIZE,
             label_mode='categorical'
         )
+        
+        # Dynamically update NUM_CLASSES based on actual dataset
+        global NUM_CLASSES
+        NUM_CLASSES = len(train_ds.class_names)
+        print(f"Detected {NUM_CLASSES} classes in dataset: {train_ds.class_names}")
+        
+        # Update class names file with actual classes
+        with open('src/class_names.json', 'w') as f:
+            json.dump(train_ds.class_names, f, indent=2)
+        print(f"Updated class_names.json with {NUM_CLASSES} classes")
     except ValueError as e:
         print("\n" + "="*70)
         print("ERROR: Dataset directory is empty!")

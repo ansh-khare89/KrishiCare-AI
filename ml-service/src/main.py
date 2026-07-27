@@ -31,21 +31,45 @@ async def lifespan(app: FastAPI):
     global model, class_names
     model_path = MODEL_PATH
     class_names_path = CLASS_NAMES_PATH
+    
+    print(f"Starting ML Service - Model Version: {MODEL_VERSION}")
+    print(f"Looking for model at: {model_path}")
+    print(f"Looking for class names at: {class_names_path}")
+    
     if os.path.exists(model_path):
-        print("Loading trained MobileNetV2 model...")
-        model = tf.keras.models.load_model(
-            model_path,
-            compile=False,
-            safe_mode=False,
-        )
+        try:
+            print("Loading trained MobileNetV2 model...")
+            model = tf.keras.models.load_model(
+                model_path,
+                compile=False,
+                safe_mode=False,
+            )
+            print(f"Model loaded successfully from {model_path}")
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            print("Model will be disabled until a valid model file is provided.")
+            model = None
     else:
         print(f"Warning: Model not found at '{model_path}'. Prediction endpoint will be disabled.")
+        print("Please train the model using: python src/train_model.py")
         
     if os.path.exists(class_names_path):
-        with open(class_names_path, 'r') as f:
-            class_names = json.load(f)
+        try:
+            with open(class_names_path, 'r') as f:
+                class_names = json.load(f)
+            print(f"Loaded {len(class_names)} class names from {class_names_path}")
+        except Exception as e:
+            print(f"Error loading class names: {e}")
+            class_names = None
     else:
         print(f"Warning: Class labels mapping not found at '{class_names_path}'.")
+        class_names = None
+    
+    if model is not None and class_names is not None:
+        print("ML Service fully operational - model and class names loaded")
+    else:
+        print("ML Service started in degraded mode - prediction endpoint disabled")
+    
     yield
 
 app = FastAPI(

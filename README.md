@@ -222,10 +222,37 @@ vercel --prod
 
 ## Troubleshooting
 
-- **API Offline**: Check that backend is running on port 8080
-- **ML Model Not Trained**: Run `python src/train_model.py --quick` in ml-service
+- **API Offline**: Check that backend is running on port 8080, or click "Wake Up" button in service status
+- **ML Model Not Trained**: Run `.\scripts\train-model.ps1` or `python src/train_model.py --quick` in ml-service
 - **Weather Search Not Working**: Add `WEATHER_API_KEY` to environment variables or use mock data (default)
 - **CORS Errors**: Ensure frontend URL is in backend CORS configuration
+- **Prediction Failing**: The current model supports only 6 classes (tomato/potato). Retrain with 38 classes using the training script
+- **ML Service Waking Up**: Service is starting up or model is loading. Wait a moment and try again, or check ML service logs
+
+## Model Retraining Required
+
+The system has been upgraded to support 38 disease classes across 30+ crops. The existing model file was trained on only 6 classes (tomato and potato diseases). To enable full functionality:
+
+1. **Quick Retraining (for testing)**:
+   ```powershell
+   .\scripts\train-model.ps1
+   # Select option 1 for quick test (50 images per class, 8 epochs)
+   ```
+
+2. **Full Retraining (for production)**:
+   ```powershell
+   .\scripts\train-model.ps1
+   # Select option 3 for full dataset (200 images per class, 30 epochs)
+   ```
+
+3. **Manual Training**:
+   ```bash
+   cd ml-service
+   python src/download_dataset.py --max-per-class 200
+   python src/train_model.py
+   ```
+
+After retraining, the new model will support: Tomato, Potato, Corn, Apple, Grape, Pepper, Peach, Cherry, Strawberry, Orange, Squash, Blueberry, and Soybean diseases.
 
 ## CI/CD
 
