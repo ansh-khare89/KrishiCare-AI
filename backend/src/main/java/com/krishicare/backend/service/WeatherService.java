@@ -41,7 +41,6 @@ public class WeatherService {
             double humidity = main != null ? ((Number) main.get("humidity")).doubleValue() : 0;
             double temp = main != null ? ((Number) main.get("temp")).doubleValue() : 0;
 
-            @SuppressWarnings("unchecked")
             var weatherList = (java.util.List<?>) data.get("weather");
             String condition = weatherList != null && !weatherList.isEmpty()
                     ? String.valueOf(((Map<?, ?>) weatherList.get(0)).get("main"))

@@ -238,35 +238,19 @@ def main():
     model = build_model()
     model.summary()
 
-    # Training callbacks
-    checkpoint = callbacks.ModelCheckpoint(
-        filepath='models/krishicare_mobilenetv2.h5',
-        monitor='val_loss',
-        save_best_only=True,
-        verbose=1
-    )
-    early_stopping = callbacks.EarlyStopping(
-        monitor='val_loss',
-        patience=5,
-        restore_best_weights=True,
-        verbose=1
-    )
-    reduce_lr = callbacks.ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.2,
-        patience=3,
-        min_lr=1e-6,
-        verbose=1
-    )
-
     # Train the neural network
     print("\nStarting model training...")
     history = model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=EPOCHS,
-        callbacks=[checkpoint, early_stopping, reduce_lr]
+        callbacks=[]
     )
+    
+    # Save model in Keras 3 format
+    print("\nSaving trained model...")
+    model.save('models/krishicare_mobilenetv2.keras')
+    print("Model saved successfully in Keras format!")
 
     # Plot metrics
     print("\nGenerating accuracy and loss plots...")

@@ -10,7 +10,9 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 MODEL_VERSION = "mobilenetv2-v2"
-MODEL_PATH = 'models/krishicare_mobilenetv2.h5'
+MODEL_PATH_KERAS = 'models/krishicare_mobilenetv2.keras'
+MODEL_PATH_H5 = 'models/krishicare_mobilenetv2.h5'
+MODEL_PATH_SAVED = 'models/krishicare_mobilenetv2'
 CLASS_NAMES_PATH = 'src/class_names.json'
 
 model = None
@@ -29,28 +31,31 @@ def make_readable(class_name):
 async def lifespan(app: FastAPI):
     """Pre-load ML model and class labels at application startup."""
     global model, class_names
-    model_path = MODEL_PATH
     class_names_path = CLASS_NAMES_PATH
     
     print(f"Starting ML Service - Model Version: {MODEL_VERSION}")
-    print(f"Looking for model at: {model_path}")
     print(f"Looking for class names at: {class_names_path}")
     
-    if os.path.exists(model_path):
-        try:
-            print("Loading trained MobileNetV2 model...")
-            model = tf.keras.models.load_model(
-                model_path,
-                compile=False,
-                safe_mode=False,
-            )
-            print(f"Model loaded successfully from {model_path}")
-        except Exception as e:
-            print(f"Error loading model: {e}")
-            print("Model will be disabled until a valid model file is provided.")
-            model = None
-    else:
-        print(f"Warning: Model not found at '{model_path}'. Prediction endpoint will be disabled.")
+    # Try loading model from Keras format first, then H5, then SavedModel
+    model_loaded = False
+    for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
+        if os.path.exists(model_path):
+            try:
+                print(f"Loading trained MobileNetV2 model from {model_path}...")
+                model = tf.keras.models.load_model(
+                    model_path,
+                    compile=False,
+                    safe_mode=False,
+                )
+                print(f"Model loaded successfully from {model_path}")
+                model_loaded = True
+                break
+            except Exception as e:
+                print(f"Error loading model from {model_path}: {e}")
+                continue
+    
+    if not model_loaded:
+        print("Warning: No valid model file found. Prediction endpoint will be disabled.")
         print("Please train the model using: python src/train_model.py")
         
     if os.path.exists(class_names_path):
