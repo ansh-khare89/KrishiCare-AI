@@ -2,6 +2,7 @@ import os
 import io
 import json
 import time
+import asyncio
 import numpy as np
 import tensorflow as tf
 from PIL import Image

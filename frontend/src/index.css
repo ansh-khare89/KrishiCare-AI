@@ -45,11 +45,19 @@ body {
   50% { background-position: 100% 50%; }
 }
 
-.dark html,
-.dark body {
+/* Dark mode — 'dark' class is applied to <html> by ThemeProvider */
+html.dark,
+html.dark body {
   color-scheme: dark;
-  background: linear-gradient(180deg, #090d16 0%, #0f172a 50%, #090d16 100%);
+  background: linear-gradient(160deg, #020817 0%, #0a1628 30%, #071520 60%, #020817 100%);
   animation: none;
+}
+
+html.dark {
+  /* Subtle green tint at the very top to keep the brand feel */
+  background: radial-gradient(ellipse 120% 40% at 50% 0%, #041f0e 0%, #020817 40%),
+              linear-gradient(160deg, #020817 0%, #0a1628 50%, #020d17 100%);
+  min-height: 100vh;
 }
 
 .dark {

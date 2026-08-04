@@ -63,13 +63,20 @@ public class WeatherService {
     }
 
     private Map<String, Object> mockData(String city) {
+        // Generate deterministic per-city variation so different cities show different values
+        int hash = Math.abs(city.toLowerCase().hashCode());
+        int temp = 18 + (hash % 22);           // 18–39 °C range
+        int humidity = 40 + (hash / 7 % 50);   // 40–89 % range
+
+        String[] conditions = {"Sunny", "Partly Cloudy", "Cloudy", "Light Rain", "Hazy", "Clear"};
+        String condition = conditions[hash % conditions.length];
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("city", city);
-        result.put("advisory", "Weather note for " + city + ": Humid conditions favor fungal diseases. "
-                + "Avoid evening irrigation and ensure good airflow between plants.");
-        result.put("temperature", "28°C");
-        result.put("humidity", "65%");
-        result.put("condition", "Partly Cloudy");
+        result.put("advisory", buildTip(city, condition, temp, humidity));
+        result.put("temperature", temp + "°C");
+        result.put("humidity", humidity + "%");
+        result.put("condition", condition);
         return result;
     }
 
