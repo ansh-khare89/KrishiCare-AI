@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,8 +18,7 @@ public class WeatherController {
 
     @GetMapping
     @Operation(summary = "Get weather-based agricultural tips for a specific city")
-    public ResponseEntity<?> getWeatherTip(@RequestParam(value = "city", defaultValue = "New Delhi") String city) {
-        String tip = weatherService.getWeatherAdvisory(city);
-        return ResponseEntity.ok(Map.of("city", city, "advisory", tip));
+    public ResponseEntity<Map<String, Object>> getWeatherTip(@RequestParam(value = "city", defaultValue = "New Delhi") String city) {
+        return ResponseEntity.ok(weatherService.getWeatherData(city));
     }
 }
