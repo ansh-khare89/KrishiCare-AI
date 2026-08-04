@@ -43,13 +43,13 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
 
   if (preview) {
     return (
-      <div className="relative overflow-hidden rounded-2xl border border-leaf-200 bg-white shadow-sm">
-        <img src={preview} alt="Selected leaf" className="max-h-80 w-full object-contain bg-earth-50" />
+      <div className="relative overflow-hidden rounded-2xl border border-leaf-200 bg-white shadow-sm dark:border-earth-700 dark:bg-earth-900">
+        <img src={preview} alt="Selected leaf" className="max-h-80 w-full object-contain bg-earth-50 dark:bg-earth-800" />
         {!disabled && (
           <button
             type="button"
             onClick={onClear}
-            className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-earth-700 shadow-md transition hover:bg-white hover:text-red-600"
+            className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-earth-700 shadow-md transition hover:bg-white hover:text-red-600 dark:bg-earth-800/90 dark:text-earth-200 dark:hover:bg-earth-700"
             aria-label="Remove image"
           >
             <X className="h-4 w-4" />
@@ -74,17 +74,17 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
         onDrop={onDrop}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-14 transition-colors ${
           dragOver
-            ? 'border-leaf-500 bg-leaf-50'
-            : 'border-leaf-200 bg-white hover:border-leaf-400 hover:bg-leaf-50/50'
+            ? 'border-leaf-500 bg-leaf-50 dark:border-leaf-400 dark:bg-leaf-900/30'
+            : 'border-leaf-200 bg-white hover:border-leaf-400 hover:bg-leaf-50/50 dark:border-earth-600 dark:bg-earth-800/50 dark:hover:border-leaf-500 dark:hover:bg-earth-800'
         } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
       >
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-leaf-100 text-leaf-600">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-leaf-100 text-leaf-600 dark:bg-leaf-900/50 dark:text-leaf-400">
           {dragOver ? <ImageIcon className="h-8 w-8" /> : <Upload className="h-8 w-8" />}
         </div>
-        <p className="text-lg font-semibold text-earth-900">
+        <p className="text-lg font-semibold text-earth-900 dark:text-earth-100">
           {dragOver ? 'Drop your leaf image here' : 'Upload a leaf photo'}
         </p>
-        <p className="mt-2 text-sm text-earth-700/70">
+        <p className="mt-2 text-sm text-earth-600 dark:text-earth-400">
           Drag &amp; drop or click to browse — JPEG, PNG, WebP up to {MAX_SIZE_MB} MB
         </p>
         <input
@@ -96,9 +96,9 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {file && !preview && (
-        <p className="mt-2 text-sm text-leaf-700">Selected: {file.name}</p>
+        <p className="mt-2 text-sm text-leaf-700 dark:text-leaf-400">Selected: {file.name}</p>
       )}
     </div>
   )

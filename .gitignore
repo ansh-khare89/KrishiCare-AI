@@ -10,7 +10,9 @@ ml-service/__pycache__/
 *.pyc
 
 # ML artifacts & data
-ml-service/models/
+!ml-service/models/
+ml-service/models/*
+!ml-service/models/krishicare_mobilenetv2.keras
 ml-service/dataset/
 *.h5
 

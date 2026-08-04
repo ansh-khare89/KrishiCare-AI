@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 dataset/
 models/*.h5
-models/*.keras
 models/*.png
 .env
+
+# Allow committing the specific trained model
+!models/krishicare_mobilenetv2.keras

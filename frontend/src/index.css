@@ -11,9 +11,14 @@
   --color-leaf-700: #15803d;
   --color-leaf-800: #166534;
   --color-leaf-900: #14532d;
+  --color-leaf-950: #052e16;
   --color-earth-50: #faf6f1;
   --color-earth-100: #f0e6d8;
   --color-earth-200: #e0ccb0;
+  --color-earth-300: #c4a882;
+  --color-earth-400: #a68b5b;
+  --color-earth-500: #8b7044;
+  --color-earth-600: #7a5f38;
   --color-earth-700: #6b4c2a;
   --color-earth-800: #4a3420;
   --color-earth-900: #2d1f14;
@@ -42,6 +47,21 @@ body {
 
 .dark body {
   color-scheme: dark;
-  background: linear-gradient(180deg, #1a120c 0%, #2d1f14 100%);
+  background: linear-gradient(180deg, #090d16 0%, #0f172a 50%, #090d16 100%);
   animation: none;
+}
+
+.dark {
+  --color-earth-50: #1e293b;
+  --color-earth-100: #334155;
+  --color-earth-200: #475569;
+  --color-earth-300: #cbd5e1;
+  --color-earth-400: #94a3b8;
+  --color-earth-500: #64748b;
+  --color-earth-600: #475569;
+  --color-earth-700: #334155;
+  --color-earth-800: #1e293b;
+  --color-earth-900: #0f172a;
+  --color-earth-950: #020617;
+  color: #cbd5e1;
 }

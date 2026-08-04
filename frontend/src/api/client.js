@@ -59,7 +59,8 @@ api.interceptors.response.use(
     } else if (error.code === 'ERR_NETWORK') {
       error.message = 'Network error. Please check your connection and try again.'
     } else if (error.response?.status === 503) {
-      error.message = 'Service temporarily unavailable. Please try again in a moment.'
+      const detail = error.response?.data?.detail || error.response?.data?.message
+      error.message = detail || 'Service temporarily unavailable. Please try again in a moment.'
     }
     
     return Promise.reject(error)

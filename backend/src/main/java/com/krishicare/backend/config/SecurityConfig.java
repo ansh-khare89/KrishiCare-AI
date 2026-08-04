@@ -32,6 +32,8 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/crop/**").permitAll()
+                        .requestMatchers("/api/weather").permitAll()
+                        .requestMatchers("/api/ping").permitAll()
                         .anyRequest().authenticated()
                 )
                 .headers(h -> h.frameOptions(f -> f.sameOrigin()))

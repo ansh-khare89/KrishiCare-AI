@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, ScanSearch, CloudSun, Droplet, Thermometer, Search, AlertCircle } from 'lucide-react'
 import heroImg from '../assets/hero.png'
 import ImageUpload from '../components/ImageUpload'
@@ -48,24 +48,33 @@ export default function HomePage() {
   const [selectedCityOption, setSelectedCityOption] = useState('New Delhi')
   const [weatherData, setWeatherData] = useState(null)
   const [weatherLoading, setWeatherLoading] = useState(false)
+  const weatherRequestId = useRef(0)
 
-  const handleFetchWeather = async (cityToFetch = weatherInput) => {
+  const handleFetchWeather = async (cityToFetch) => {
+    if (!cityToFetch?.trim()) return
+    const requestId = ++weatherRequestId.current
     setWeatherLoading(true)
+    setWeatherCity(cityToFetch)
     try {
       const data = await fetchWeatherAdvisory(cityToFetch)
+      if (requestId !== weatherRequestId.current) return
       setWeatherData(data)
       setWeatherCity(data.city || cityToFetch)
     } catch (err) {
+      if (requestId !== weatherRequestId.current) return
       console.error('Weather fetch error:', err)
-      // Show fallback message but don't block the UI
-      setWeatherData({ 
-        city: cityToFetch, 
-        advisory: 'Weather service temporarily unavailable. Using default advisory.',
+      setWeatherCity(cityToFetch)
+      setWeatherData({
+        city: cityToFetch,
+        advisory: 'Weather service temporarily unavailable. Using default advisory for your region.',
         temperature: '--',
-        humidity: '--'
+        humidity: '--',
+        condition: '--',
       })
     } finally {
-      setWeatherLoading(false)
+      if (requestId === weatherRequestId.current) {
+        setWeatherLoading(false)
+      }
     }
   }
 
@@ -129,10 +138,13 @@ export default function HomePage() {
     } catch (err) {
       const message =
         err.response?.data?.message ||
-        err.response?.data ||
+        (typeof err.response?.data === 'string' ? err.response.data : null) ||
         err.message ||
         'Prediction failed. Please check if services are running and try again.'
-      setError(typeof message === 'string' ? message : 'Unexpected error.')
+      const displayMessage = message.includes('not loaded') || message.includes('not trained')
+        ? 'ML model is not ready. Start the ML service (port 8000) or run scripts/train-model.ps1 to train the model.'
+        : (typeof message === 'string' ? message : 'Unexpected error.')
+      setError(displayMessage)
       push('Prediction failed. Try clicking "Wake Up" in the service status.', 'error')
     } finally {
       setLoading(false)
@@ -182,6 +194,7 @@ export default function HomePage() {
                 const val = e.target.value
                 setSelectedCityOption(val)
                 if (val !== 'custom') {
+                  setWeatherInput(val)
                   handleFetchWeather(val)
                 } else {
                   setWeatherInput('')
@@ -225,14 +238,14 @@ export default function HomePage() {
           </div>
         ) : weatherData ? (
           <div className="grid gap-6 md:grid-cols-3 items-center">
-            <div className="md:col-span-2 flex flex-col justify-center rounded-2xl bg-leaf-50/50 p-5 dark:bg-leaf-950/20 border border-leaf-100/30 dark:border-earth-800">
+            <div className="md:col-span-2 flex flex-col justify-center rounded-2xl bg-leaf-50/50 p-5 dark:bg-leaf-900/20 border border-leaf-100/30 dark:border-earth-800">
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-leaf-600 dark:text-leaf-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-semibold text-leaf-800 dark:text-leaf-300 text-sm mb-1">
-                    Advisory for {weatherCity}
+                    Advisory for {weatherData.city || weatherCity}
                   </h4>
-                  <p className="text-sm text-earth-850 dark:text-earth-200 leading-relaxed font-medium">
+                  <p className="text-sm text-earth-800 dark:text-earth-200 leading-relaxed font-medium">
                     {weatherData.advisory || "No weather advisory returned."}
                   </p>
                 </div>
@@ -244,16 +257,16 @@ export default function HomePage() {
                 <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400">
                   <Thermometer className="h-5 w-5" />
                 </div>
-                <p className="mt-2 text-xs text-earth-700 dark:text-earth-450 font-medium">Weather condition</p>
-                <p className="text-lg font-bold text-earth-800 dark:text-earth-200 mt-0.5 capitalize">Live</p>
+                <p className="mt-2 text-xs text-earth-600 dark:text-earth-400 font-medium">Temperature</p>
+                <p className="text-lg font-bold text-earth-800 dark:text-earth-200 mt-0.5">{weatherData.temperature || '--'}</p>
               </div>
-              <div className="h-12 w-px bg-leaf-100 dark:bg-earth-800" />
+              <div className="h-12 w-px bg-leaf-100 dark:bg-earth-700" />
               <div className="text-center">
                 <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
                   <Droplet className="h-5 w-5" />
                 </div>
-                <p className="mt-2 text-xs text-earth-700 dark:text-earth-450 font-medium">Watering Needs</p>
-                <p className="text-lg font-bold text-earth-800 dark:text-earth-200 mt-0.5">Optimized</p>
+                <p className="mt-2 text-xs text-earth-600 dark:text-earth-400 font-medium">Humidity</p>
+                <p className="text-lg font-bold text-earth-800 dark:text-earth-200 mt-0.5">{weatherData.humidity || '--'}</p>
               </div>
             </div>
           </div>

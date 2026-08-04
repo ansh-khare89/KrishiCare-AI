@@ -3,6 +3,7 @@ package com.krishicare.backend.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
@@ -13,15 +14,15 @@ public class WeatherService {
 
     private final RestClient restClient = RestClient.builder().build();
 
-    public String getWeatherAdvisory(String city) {
+    public Map<String, Object> getWeatherData(String city) {
         if (city == null || city.isBlank()) {
-            return "";
+            return Map.of("city", "", "advisory", "", "temperature", "--", "humidity", "--", "condition", "--");
         }
 
         try {
             if (apiKey == null || apiKey.isBlank()) {
                 System.out.println("Weather API key not configured, using mock data for city: " + city);
-                return mockTip(city);
+                return mockData(city);
             }
 
             @SuppressWarnings("unchecked")
@@ -33,7 +34,7 @@ public class WeatherService {
 
             if (data == null) {
                 System.out.println("Weather API returned null data for city: " + city);
-                return mockTip(city);
+                return mockData(city);
             }
 
             @SuppressWarnings("unchecked")
@@ -47,16 +48,29 @@ public class WeatherService {
                     : "Unknown";
 
             System.out.println("Weather data retrieved for " + city + ": " + condition + ", " + temp + "°C, " + humidity + "%");
-            return buildTip(city, condition, temp, humidity);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("city", city);
+            result.put("advisory", buildTip(city, condition, temp, humidity));
+            result.put("temperature", String.format("%.0f°C", temp));
+            result.put("humidity", String.format("%.0f%%", humidity));
+            result.put("condition", condition);
+            return result;
         } catch (Exception e) {
             System.out.println("Weather API failed for city " + city + ": " + e.getMessage() + ", using mock data");
-            return mockTip(city);
+            return mockData(city);
         }
     }
 
-    private String mockTip(String city) {
-        return "Weather note for " + city + ": Humid conditions favor fungal diseases. "
-                + "Avoid evening irrigation and ensure good airflow between plants.";
+    private Map<String, Object> mockData(String city) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("city", city);
+        result.put("advisory", "Weather note for " + city + ": Humid conditions favor fungal diseases. "
+                + "Avoid evening irrigation and ensure good airflow between plants.");
+        result.put("temperature", "28°C");
+        result.put("humidity", "65%");
+        result.put("condition", "Partly Cloudy");
+        return result;
     }
 
     private String buildTip(String city, String condition, double temp, double humidity) {
