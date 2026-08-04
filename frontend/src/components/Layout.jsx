@@ -15,8 +15,8 @@ export default function Layout() {
   const { dark, toggle } = useTheme()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-leaf-50 via-white to-earth-50 dark:from-earth-900 dark:via-earth-900 dark:to-earth-950">
-      <header className="sticky top-0 z-50 border-b border-leaf-200/60 bg-white/80 backdrop-blur-md dark:border-earth-700 dark:bg-earth-900/80">
+    <div className="min-h-screen dark:bg-gradient-to-b dark:from-earth-900 dark:via-earth-900 dark:to-earth-950">
+      <header className="sticky top-0 z-50 border-b border-leaf-200/60 bg-white/90 backdrop-blur-lg shadow-sm dark:border-earth-700 dark:bg-earth-900/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-leaf-600 text-white shadow-md shadow-leaf-600/25">

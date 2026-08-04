@@ -8,7 +8,7 @@ function HistoryCard({ item }) {
   const healthy = isHealthy(item.diseaseName)
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-leaf-100 bg-white/80 shadow-sm backdrop-blur transition hover:shadow-md dark:border-earth-700 dark:bg-earth-900/80">
+    <article className="overflow-hidden rounded-2xl border border-leaf-200/60 bg-white/80 shadow-sm backdrop-blur-xl transition-shadow hover:shadow-md dark:border-earth-700 dark:bg-earth-900/80">
       <div className="aspect-video overflow-hidden bg-earth-50 dark:bg-earth-800">
         {item.imageUrl ? (
           <img

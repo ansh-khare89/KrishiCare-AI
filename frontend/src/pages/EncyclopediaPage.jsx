@@ -14,7 +14,7 @@ export default function EncyclopediaPage() {
         {DISEASES.map((d) => (
           <article
             key={d.id}
-            className="rounded-2xl border border-leaf-100 bg-white/80 p-6 backdrop-blur dark:border-earth-700 dark:bg-earth-900/80"
+            className="rounded-2xl border border-leaf-200/60 bg-white/80 p-6 shadow-sm backdrop-blur-xl transition-shadow hover:shadow-md dark:border-earth-700 dark:bg-earth-900/80"
           >
             <div className="mb-3 flex items-center gap-2">
               <span className="rounded-full bg-leaf-100 px-2.5 py-0.5 text-xs font-medium text-leaf-700 dark:bg-leaf-900/40 dark:text-leaf-300">

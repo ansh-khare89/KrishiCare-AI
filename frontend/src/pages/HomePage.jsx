@@ -115,9 +115,9 @@ export default function HomePage() {
 
   return (
     <div className="space-y-10">
-      <section className="relative overflow-hidden rounded-3xl border border-leaf-100 bg-white/60 p-8 shadow-sm backdrop-blur-md dark:border-earth-700 dark:bg-earth-900/50">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-leaf-400/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-amber-300/20 blur-3xl" />
+      <section className="relative overflow-hidden rounded-3xl border border-leaf-200/70 bg-white/80 p-8 shadow-lg backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/50">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-leaf-400/30 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-sky-400/20 blur-3xl" />
 
         <div className="relative grid items-center gap-8 md:grid-cols-2">
           <div>
@@ -138,7 +138,7 @@ export default function HomePage() {
       </section>
 
       {/* Weather Advisory Section */}
-      <section className="rounded-3xl border border-leaf-100/60 bg-white/60 p-6 shadow-sm backdrop-blur-md dark:border-earth-700 dark:bg-earth-900/50">
+      <section className="rounded-3xl border border-leaf-200/60 bg-white/80 p-6 shadow-md backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/50">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div>
             <h2 className="text-xl font-bold text-earth-900 dark:text-earth-50 flex items-center gap-2">
@@ -213,7 +213,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="rounded-3xl border border-leaf-100 bg-white/70 p-6 shadow-sm backdrop-blur dark:border-earth-700 dark:bg-earth-900/60 sm:p-8">
+      <section className="rounded-3xl border border-leaf-200/60 bg-white/80 p-6 shadow-md backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/60 sm:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-xl font-semibold text-earth-900 dark:text-earth-50">Upload leaf</h2>
           <div className="flex gap-2 rounded-xl bg-earth-50 p-1 dark:bg-earth-800">

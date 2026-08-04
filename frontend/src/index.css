@@ -18,6 +18,9 @@
   --color-earth-800: #4a3420;
   --color-earth-900: #2d1f14;
   --color-earth-950: #1a120c;
+  --color-sky-50: #f0f9ff;
+  --color-sky-100: #e0f2fe;
+  --color-sky-500: #0ea5e9;
 }
 
 @variant dark (&:where(.dark, .dark *));
@@ -27,8 +30,18 @@ body {
   min-height: 100vh;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 25%, #f0f9ff 50%, #faf6f1 75%, #f0fdf4 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 .dark body {
   color-scheme: dark;
+  background: linear-gradient(180deg, #1a120c 0%, #2d1f14 100%);
+  animation: none;
 }

@@ -5,7 +5,7 @@ import { SkeletonCard } from '../components/Skeleton'
 
 function StatCard({ label, value, icon: Icon, color }) {
   return (
-    <div className="rounded-2xl border border-leaf-100 bg-white/80 p-5 backdrop-blur dark:border-earth-700 dark:bg-earth-900/80">
+    <div className="rounded-2xl border border-leaf-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/80">
       <div className="flex items-center justify-between">
         <p className="text-sm text-earth-600 dark:text-earth-400">{label}</p>
         <Icon className={`h-5 w-5 ${color}`} />
@@ -51,7 +51,7 @@ export default function AnalyticsPage() {
       </div>
 
       {data?.byCrop && Object.keys(data.byCrop).length > 0 && (
-        <section className="rounded-2xl border border-leaf-100 bg-white/80 p-6 dark:border-earth-700 dark:bg-earth-900/80">
+        <section className="rounded-2xl border border-leaf-200/60 bg-white/80 p-6 shadow-sm backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/80">
           <h2 className="mb-4 font-semibold text-earth-900 dark:text-earth-50">By crop</h2>
           <div className="flex flex-wrap gap-4">
             {Object.entries(data.byCrop).map(([crop, count]) => (
@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
       )}
 
       {data?.byDisease?.length > 0 && (
-        <section className="rounded-2xl border border-leaf-100 bg-white/80 p-6 dark:border-earth-700 dark:bg-earth-900/80">
+        <section className="rounded-2xl border border-leaf-200/60 bg-white/80 p-6 shadow-sm backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/80">
           <h2 className="mb-4 font-semibold text-earth-900 dark:text-earth-50">Disease breakdown</h2>
           <div className="space-y-3">
             {data.byDisease.map((d) => (
