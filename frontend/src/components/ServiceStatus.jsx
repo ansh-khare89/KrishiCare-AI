@@ -64,8 +64,8 @@ export default function ServiceStatus() {
   const mlMessage = mlReady
     ? 'ready'
     : mlStatus === 'unreachable'
-      ? 'offline — start ML service on port 8000'
-      : 'not trained — run scripts/train-model.ps1'
+      ? 'offline — waking up…'
+      : 'loading model…'
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-leaf-100 bg-white/80 px-4 py-2 text-sm dark:border-earth-700 dark:bg-earth-900/80">
@@ -87,7 +87,7 @@ export default function ServiceStatus() {
         )}
         ML model {mlMessage}
       </span>
-      {!backendOk && (
+      {(!backendOk || !mlReady) && (
         <button
           onClick={handleWakeUp}
           disabled={wakingUp}

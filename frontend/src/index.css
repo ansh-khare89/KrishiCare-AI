@@ -45,6 +45,7 @@ body {
   50% { background-position: 100% 50%; }
 }
 
+.dark html,
 .dark body {
   color-scheme: dark;
   background: linear-gradient(180deg, #090d16 0%, #0f172a 50%, #090d16 100%);

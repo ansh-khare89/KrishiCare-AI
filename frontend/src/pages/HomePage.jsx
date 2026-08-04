@@ -55,6 +55,7 @@ export default function HomePage() {
     const requestId = ++weatherRequestId.current
     setWeatherLoading(true)
     setWeatherCity(cityToFetch)
+    setWeatherData(null) // clear stale data immediately so heading doesn't show old city
     try {
       const data = await fetchWeatherAdvisory(cityToFetch)
       if (requestId !== weatherRequestId.current) return
@@ -66,7 +67,7 @@ export default function HomePage() {
       setWeatherCity(cityToFetch)
       setWeatherData({
         city: cityToFetch,
-        advisory: 'Weather service temporarily unavailable. Using default advisory for your region.',
+        advisory: 'Weather service temporarily unavailable. Showing general advisory: Humid conditions favor fungal diseases — avoid evening irrigation and ensure good airflow between plants.',
         temperature: '--',
         humidity: '--',
         condition: '--',
@@ -80,6 +81,7 @@ export default function HomePage() {
 
   useEffect(() => {
     handleFetchWeather('New Delhi')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

@@ -2,7 +2,6 @@ import os
 import io
 import json
 import time
-import asyncio
 import numpy as np
 import tensorflow as tf
 from PIL import Image
@@ -39,7 +38,6 @@ def load_model_and_classes():
 
     print("Loading model and classes dynamically...")
     # Try loading model from Keras format first, then H5, then SavedModel
-    model_loaded = False
     for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
         if os.path.exists(model_path):
             try:
@@ -50,7 +48,6 @@ def load_model_and_classes():
                     safe_mode=False,
                 )
                 print(f"Model loaded successfully from {model_path}")
-                model_loaded = True
                 break
             except Exception as e:
                 print(f"Error loading model from {model_path}: {e}")
@@ -81,16 +78,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS to allow internal Spring Boot API requests
+# Enable CORS — allow all origins for internal Render service-to-service calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:8080",
-        "https://krishi-care-ai.vercel.app",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

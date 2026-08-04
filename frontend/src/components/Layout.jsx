@@ -69,7 +69,7 @@ export default function Layout() {
       </main>
 
       <footer className="border-t border-leaf-100 py-6 text-center text-sm text-earth-700/60 dark:border-earth-800 dark:text-earth-500">
-        KrishiCare — tomato &amp; potato leaf disease detection
+        © {new Date().getFullYear()} KrishiCare — AI-powered crop disease detection for 30+ crops
       </footer>
     </div>
   )
