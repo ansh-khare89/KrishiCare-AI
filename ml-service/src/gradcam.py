@@ -7,12 +7,20 @@ from PIL import Image
 
 def _find_last_conv_layer(keras_model):
   for layer in reversed(keras_model.layers):
-    if len(layer.output_shape) == 4:
-      return layer.name
+    try:
+      shape = layer.output.shape
+      if len(shape) == 4:
+        return layer.name
+    except Exception:
+      pass
     if hasattr(layer, 'layers'):
       for sub in reversed(layer.layers):
-        if hasattr(sub, 'output_shape') and len(sub.output_shape) == 4:
-          return sub.name
+        try:
+          sub_shape = sub.output.shape
+          if len(sub_shape) == 4:
+            return sub.name
+        except Exception:
+          pass
   return None
 
 
@@ -24,15 +32,20 @@ def generate_gradcam_overlay(model, img_array, class_idx):
     if last_conv_name is None:
       return None
 
+    # Reconstruct the classification path starting from base_layer.output
+    # to bypass Functional model nested connection path errors in Keras 3
+    x = base_layer.output
+    for name in ['global_pooling', 'batch_norm', 'dropout1', 'fc1', 'batch_norm2', 'dropout2', 'classifier']:
+      x = model.get_layer(name)(x)
+
     grad_model = tf.keras.models.Model(
-        [model.inputs, base_layer.get_layer(last_conv_name).output],
-        base_layer.get_layer(last_conv_name).output,
+        base_layer.input,
+        [base_layer.get_layer(last_conv_name).output, x],
     )
 
     with tf.GradientTape() as tape:
-      conv_outputs = grad_model(img_array)
+      conv_outputs, preds = grad_model(img_array)
       tape.watch(conv_outputs)
-      preds = model(img_array)
       loss = preds[:, class_idx]
 
     grads = tape.gradient(loss, conv_outputs)

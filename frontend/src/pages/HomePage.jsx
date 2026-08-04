@@ -7,6 +7,31 @@ import { SkeletonResult } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { predictCropHealth, predictBatch, fetchWeatherAdvisory } from '../api/client'
 
+const POPULAR_CITIES = [
+  { value: 'New Delhi', label: 'New Delhi (NCR)' },
+  { value: 'Mumbai', label: 'Mumbai (Maharashtra)' },
+  { value: 'Bengaluru', label: 'Bengaluru (Karnataka)' },
+  { value: 'Chennai', label: 'Chennai (Tamil Nadu)' },
+  { value: 'Kolkata', label: 'Kolkata (West Bengal)' },
+  { value: 'Hyderabad', label: 'Hyderabad (Telangana)' },
+  { value: 'Pune', label: 'Pune (Maharashtra)' },
+  { value: 'Jaipur', label: 'Jaipur (Rajasthan)' },
+  { value: 'Lucknow', label: 'Lucknow (Uttar Pradesh)' },
+  { value: 'Patna', label: 'Patna (Bihar)' },
+  { value: 'Bhopal', label: 'Bhopal (Madhya Pradesh)' },
+  { value: 'Chandigarh', label: 'Chandigarh (Punjab/Haryana)' },
+  { value: 'Amritsar', label: 'Amritsar (Punjab)' },
+  { value: 'Nashik', label: 'Nashik (Maharashtra)' },
+  { value: 'Nagpur', label: 'Nagpur (Maharashtra)' },
+  { value: 'Coimbatore', label: 'Coimbatore (Tamil Nadu)' },
+  { value: 'Vijayawada', label: 'Vijayawada (Andhra Pradesh)' },
+  { value: 'Guwahati', label: 'Guwahati (Assam)' },
+  { value: 'Srinagar', label: 'Srinagar (Jammu & Kashmir)' },
+  { value: 'Ranchi', label: 'Ranchi (Jharkhand)' },
+  { value: 'Shimla', label: 'Shimla (Himachal Pradesh)' },
+  { value: 'custom', label: 'Other (Type manually)...' }
+]
+
 export default function HomePage() {
   const { push } = useToast()
   const [file, setFile] = useState(null)
@@ -20,6 +45,7 @@ export default function HomePage() {
   const [batchResults, setBatchResults] = useState([])
   const [weatherCity, setWeatherCity] = useState('New Delhi')
   const [weatherInput, setWeatherInput] = useState('New Delhi')
+  const [selectedCityOption, setSelectedCityOption] = useState('New Delhi')
   const [weatherData, setWeatherData] = useState(null)
   const [weatherLoading, setWeatherLoading] = useState(false)
 
@@ -149,25 +175,48 @@ export default function HomePage() {
               Get disease risk alerts and watering advice based on your local weather.
             </p>
           </div>
-          <form 
-            onSubmit={(e) => { e.preventDefault(); handleFetchWeather(); }}
-            className="flex items-center gap-2 bg-white/80 dark:bg-earth-800 rounded-xl p-1 shadow-inner border border-leaf-100/50 dark:border-earth-700"
-          >
-            <input
-              type="text"
-              value={weatherInput}
-              onChange={(e) => setWeatherInput(e.target.value)}
-              placeholder="Enter city..."
-              className="bg-transparent px-3 py-1 text-sm text-earth-900 focus:outline-none dark:text-earth-50"
-            />
-            <button
-              type="submit"
-              disabled={weatherLoading}
-              className="rounded-lg bg-leaf-600 p-1.5 text-white shadow-md hover:bg-leaf-700 disabled:opacity-50 transition-colors"
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={selectedCityOption}
+              onChange={(e) => {
+                const val = e.target.value
+                setSelectedCityOption(val)
+                if (val !== 'custom') {
+                  handleFetchWeather(val)
+                } else {
+                  setWeatherInput('')
+                }
+              }}
+              className="rounded-xl border border-leaf-100/50 bg-white/80 dark:border-earth-700 dark:bg-earth-800 px-3 py-2 text-sm text-earth-900 focus:outline-none dark:text-earth-50 shadow-sm font-semibold transition-all hover:border-leaf-300 cursor-pointer"
             >
-              <Search className="h-4 w-4" />
-            </button>
-          </form>
+              {POPULAR_CITIES.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+
+            {selectedCityOption === 'custom' && (
+              <form 
+                onSubmit={(e) => { e.preventDefault(); handleFetchWeather(weatherInput); }}
+                className="flex items-center gap-2 bg-white/80 dark:bg-earth-800 rounded-xl p-1 shadow-inner border border-leaf-100/50 dark:border-earth-700 animate-in fade-in slide-in-from-left-2 duration-200"
+              >
+                <input
+                  type="text"
+                  value={weatherInput}
+                  onChange={(e) => setWeatherInput(e.target.value)}
+                  placeholder="Enter city..."
+                  className="bg-transparent px-3 py-1 text-sm text-earth-900 focus:outline-none dark:text-earth-50"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={weatherLoading}
+                  className="rounded-lg bg-leaf-600 p-1.5 text-white shadow-md hover:bg-leaf-700 disabled:opacity-50 transition-colors"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              </form>
+            )}
+          </div>
         </div>
 
         {weatherLoading ? (

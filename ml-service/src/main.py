@@ -1,6 +1,7 @@
 import os
 import io
 import json
+import time
 import asyncio
 import numpy as np
 import tensorflow as tf
@@ -10,10 +11,13 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 MODEL_VERSION = "mobilenetv2-v2"
-MODEL_PATH_KERAS = 'models/krishicare_mobilenetv2.keras'
-MODEL_PATH_H5 = 'models/krishicare_mobilenetv2.h5'
-MODEL_PATH_SAVED = 'models/krishicare_mobilenetv2'
-CLASS_NAMES_PATH = 'src/class_names.json'
+
+# Resolve paths relative to the directory containing main.py
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH_KERAS = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2.keras')
+MODEL_PATH_H5 = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2.h5')
+MODEL_PATH_SAVED = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2')
+CLASS_NAMES_PATH = os.path.join(BASE_DIR, 'src', 'class_names.json')
 
 model = None
 class_names = None
@@ -27,15 +31,13 @@ def make_readable(class_name):
         return f"{crop} ({disease})"
     return class_name.replace('___', ' - ').replace('_', ' ')
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Pre-load ML model and class labels at application startup."""
+def load_model_and_classes():
+    """Load the model and class mapping if not already loaded."""
     global model, class_names
-    class_names_path = CLASS_NAMES_PATH
-    
-    print(f"Starting ML Service - Model Version: {MODEL_VERSION}")
-    print(f"Looking for class names at: {class_names_path}")
-    
+    if model is not None and class_names is not None:
+        return True
+
+    print("Loading model and classes dynamically...")
     # Try loading model from Keras format first, then H5, then SavedModel
     model_loaded = False
     for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
@@ -53,28 +55,23 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 print(f"Error loading model from {model_path}: {e}")
                 continue
-    
-    if not model_loaded:
-        print("Warning: No valid model file found. Prediction endpoint will be disabled.")
-        print("Please train the model using: python src/train_model.py")
-        
-    if os.path.exists(class_names_path):
+
+    if os.path.exists(CLASS_NAMES_PATH):
         try:
-            with open(class_names_path, 'r') as f:
+            with open(CLASS_NAMES_PATH, 'r') as f:
                 class_names = json.load(f)
-            print(f"Loaded {len(class_names)} class names from {class_names_path}")
+            print(f"Loaded {len(class_names)} class names from {CLASS_NAMES_PATH}")
         except Exception as e:
             print(f"Error loading class names: {e}")
             class_names = None
-    else:
-        print(f"Warning: Class labels mapping not found at '{class_names_path}'.")
-        class_names = None
-    
-    if model is not None and class_names is not None:
-        print("ML Service fully operational - model and class names loaded")
-    else:
-        print("ML Service started in degraded mode - prediction endpoint disabled")
-    
+
+    return model is not None and class_names is not None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Pre-load ML model and class labels at application startup."""
+    print(f"Starting ML Service - Model Version: {MODEL_VERSION}")
+    load_model_and_classes()
     yield
 
 app = FastAPI(
@@ -114,7 +111,7 @@ def ping():
     return {
         "status": "pong",
         "service": "KrishiCare AI ML Service",
-        "timestamp": str(asyncio.get_event_loop().time())
+        "timestamp": str(time.time())
     }
 
 def run_inference(img_batch, class_idx=None, explain=False):
@@ -152,18 +149,11 @@ def run_inference(img_batch, class_idx=None, explain=False):
 @app.post("/predict")
 async def predict(file: UploadFile = File(...), explain: bool = False):
     """Perform crop disease prediction on uploaded leaf image."""
-    global model, class_names
-    
-    if model is None or class_names is None:
-        if os.path.exists(MODEL_PATH) and os.path.exists(CLASS_NAMES_PATH):
-            model = tf.keras.models.load_model(MODEL_PATH, compile=False, safe_mode=False)
-            with open(CLASS_NAMES_PATH, 'r') as f:
-                class_names = json.load(f)
-        else:
-            raise HTTPException(
-                status_code=503, 
-                detail="ML model is not loaded. Please train the model before requesting predictions."
-            )
+    if not load_model_and_classes():
+        raise HTTPException(
+            status_code=503, 
+            detail="ML model is not loaded. Please train the model before requesting predictions."
+        )
 
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
