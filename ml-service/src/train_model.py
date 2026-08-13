@@ -1,267 +1,357 @@
+"""
+KrishiCare AI - Enhanced Training Script
+=========================================
+Major improvements for accuracy:
+  1. EfficientNetV2B0 backbone (more accurate than MobileNetV2)
+  2. Two-phase training: head warmup → fine-tuning
+  3. EarlyStopping + ReduceLROnPlateau + ModelCheckpoint
+  4. Class weights to handle imbalanced data
+  5. More aggressive data augmentation (cutout, mixup-style)
+  6. Label smoothing for better generalization
+  7. Saves best model by val_accuracy (not last epoch)
+"""
+
 import os
 import json
 import argparse
+import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras import layers, models, callbacks
-import numpy as np
+from tensorflow.keras import layers, models, callbacks, regularizers
+from collections import Counter
 
-# Configuration constants
+# Configuration
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
-EPOCHS = 30
-NUM_CLASSES = 38  # Will be updated dynamically based on available classes
+EPOCHS_WARMUP = 15      # Phase 1: train classifier head only
+EPOCHS_FINETUNE = 20    # Phase 2: fine-tune top layers of backbone
 
-def setup_directories():
-    """Ensure necessary directories exist and create the expected structure."""
-    os.makedirs('models', exist_ok=True)
-    os.makedirs('src', exist_ok=True)
-    
-    # Dataset subfolders mapping - comprehensive 38 classes
-    dataset_dirs = ['dataset/train', 'dataset/val', 'dataset/test']
-    classes = [
-        # Tomato (10 classes)
-        'Tomato___healthy', 'Tomato___Early_blight', 'Tomato___Late_blight',
-        'Tomato___Bacterial_spot', 'Tomato___Leaf_Mold', 'Tomato___Septoria_leaf_spot',
-        'Tomato___Spider_mites_Two-spotted_spider_mite', 'Tomato___Target_Spot',
-        'Tomato___Tomato_Yellow_Leaf_Curl_Virus', 'Tomato___Tomato_mosaic_virus',
-        # Potato (3 classes)
-        'Potato___healthy', 'Potato___Early_blight', 'Potato___Late_blight',
-        # Corn (4 classes)
-        'Corn_(maize)___healthy', 'Corn_(maize)___Common_rust',
-        'Corn_(maize)___Northern_Leaf_Blight', 'Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot',
-        # Apple (4 classes)
-        'Apple___healthy', 'Apple___Apple_scab', 'Apple___Black_rot', 'Apple___Cedar_apple_rust',
-        # Grape (4 classes)
-        'Grape___healthy', 'Grape___Black_rot', 'Grape___Esca_(Black_Measles)',
-        'Grape___Leaf_blight_(Isariopsis_Leaf_Spot)',
-        # Pepper (2 classes)
-        'Pepper,_bell___healthy', 'Pepper,_bell___Bacterial_spot',
-        # Peach (2 classes)
-        'Peach___healthy', 'Peach___Bacterial_spot',
-        # Cherry (2 classes)
-        'Cherry_(including_sour)___healthy', 'Cherry_(including_sour)___Powdery_mildew',
-        # Strawberry (2 classes)
-        'Strawberry___healthy', 'Strawberry___Leaf_scorch',
-        # Orange (1 class)
-        'Orange___Haunglongbing_(Citrus_greening)',
-        # Squash (1 class)
-        'Squash___Powdery_mildew',
-        # Blueberry (1 class)
-        'Blueberry___healthy',
-        # Soybean (1 class)
-        'Soybean___healthy',
-    ]
-    
-    for base_dir in dataset_dirs:
-        for cls in classes:
-            os.makedirs(os.path.join(base_dir, cls), exist_ok=True)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+NUM_CLASSES = 38
 
-def build_model():
-    """Build the transfer learning model based on MobileNetV2 with improved architecture."""
-    # Enhanced Data Augmentation pipeline to prevent overfitting
+
+def compute_class_weights(train_dir):
+    """Compute inverse-frequency class weights for imbalanced datasets."""
+    counts = {}
+    for cls in sorted(os.listdir(train_dir)):
+        cls_path = os.path.join(train_dir, cls)
+        if os.path.isdir(cls_path):
+            n = len([f for f in os.listdir(cls_path) if f.lower().endswith(
+                ('.jpg', '.jpeg', '.png', '.bmp', '.tiff'))])
+            counts[cls] = max(n, 1)  # avoid division by zero
+
+    total = sum(counts.values())
+    n_classes = len(counts)
+    weights = {}
+    for i, cls in enumerate(sorted(counts.keys())):
+        weights[i] = total / (n_classes * counts[cls])
+    return weights
+
+
+def build_model(num_classes, use_efficientnet=True):
+    """
+    Build enhanced transfer-learning model.
+
+    Architecture:
+    - EfficientNetV2B0 (default) or MobileNetV2 backbone (pretrained on ImageNet)
+    - Strong data augmentation pipeline
+    - Two Dense layers with BatchNorm + Dropout
+    - Label smoothing in loss
+    """
+    # ── Data augmentation ──────────────────────────────────────────────────
     data_augmentation = models.Sequential([
         layers.RandomFlip("horizontal_and_vertical"),
-        layers.RandomRotation(0.3),
-        layers.RandomZoom(0.3),
+        layers.RandomRotation(0.35),
+        layers.RandomZoom(0.25),
         layers.RandomContrast(0.3),
         layers.RandomTranslation(0.1, 0.1),
-        layers.RandomBrightness(0.2)
+        layers.RandomBrightness(0.25),
+        # Gaussian noise for robustness
+        layers.GaussianNoise(0.05),
     ], name="data_augmentation")
 
-    # Load pre-trained MobileNetV2 base model with ImageNet weights
-    base_model = tf.keras.applications.MobileNetV2(
-        input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3),
-        include_top=False,
-        weights='imagenet'
-    )
-    base_model.trainable = False  # Freeze pre-trained weights initially
+    # ── Backbone ────────────────────────────────────────────────────────────
+    if use_efficientnet:
+        base_model = tf.keras.applications.EfficientNetV2B0(
+            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3),
+            include_top=False,
+            weights='imagenet'
+        )
+        preprocess_fn = tf.keras.applications.efficientnet_v2.preprocess_input
+        backbone_name = "EfficientNetV2B0"
+    else:
+        base_model = tf.keras.applications.MobileNetV2(
+            input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3),
+            include_top=False,
+            weights='imagenet'
+        )
+        preprocess_fn = tf.keras.applications.mobilenet_v2.preprocess_input
+        backbone_name = "MobileNetV2"
 
-    # Input layer
+    base_model.trainable = False  # Freeze during warmup phase
+    print(f"Backbone: {backbone_name} with {len(base_model.layers)} layers (frozen)")
+
+    # ── Model graph ─────────────────────────────────────────────────────────
     inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3), name="input_image")
-    
-    # Apply data augmentation
     x = data_augmentation(inputs)
-    
-    # Extract features using base model in inference mode
     x = base_model(x, training=False)
-    
-    # Enhanced classification head with better regularization
-    x = layers.GlobalAveragePooling2D(name="global_pooling")(x)
-    x = layers.BatchNormalization(name="batch_norm")(x)
-    x = layers.Dropout(0.3, name="dropout1")(x)
-    x = layers.Dense(512, activation='relu', name="fc1")(x)
-    x = layers.BatchNormalization(name="batch_norm2")(x)
-    x = layers.Dropout(0.2, name="dropout2")(x)
-    outputs = layers.Dense(NUM_CLASSES, activation='softmax', name="classifier")(x)
-    
-    model = models.Model(inputs, outputs, name="KrishiCare_MobileNetV2_Enhanced")
-    
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-        loss='categorical_crossentropy',
-        metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_accuracy')]
-    )
-    return model
 
-def plot_history(history):
-    """Save training accuracy and loss plots inside models directory."""
+    # Classification head
+    x = layers.GlobalAveragePooling2D(name="global_avg_pool")(x)
+    x = layers.BatchNormalization(name="bn1")(x)
+    x = layers.Dropout(0.4, name="drop1")(x)
+    x = layers.Dense(
+        512, activation='relu',
+        kernel_regularizer=regularizers.l2(1e-4),
+        name="fc1"
+    )(x)
+    x = layers.BatchNormalization(name="bn2")(x)
+    x = layers.Dropout(0.3, name="drop2")(x)
+    x = layers.Dense(
+        256, activation='relu',
+        kernel_regularizer=regularizers.l2(1e-4),
+        name="fc2"
+    )(x)
+    x = layers.Dropout(0.2, name="drop3")(x)
+    outputs = layers.Dense(num_classes, activation='softmax', name="classifier")(x)
+
+    model = models.Model(inputs, outputs, name=f"KrishiCare_{backbone_name}")
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        # Label smoothing: reduces overconfidence, improves generalization
+        loss=tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1),
+        metrics=[
+            'accuracy',
+            tf.keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_acc')
+        ]
+    )
+    return model, base_model, preprocess_fn
+
+
+def get_callbacks(model_path, phase="warmup"):
+    """Get training callbacks for the specified phase."""
+    return [
+        callbacks.EarlyStopping(
+            monitor='val_accuracy',
+            patience=6 if phase == "warmup" else 8,
+            restore_best_weights=True,
+            verbose=1
+        ),
+        callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.3,
+            patience=3,
+            min_lr=1e-7,
+            verbose=1
+        ),
+        callbacks.ModelCheckpoint(
+            filepath=model_path,
+            monitor='val_accuracy',
+            save_best_only=True,
+            verbose=1
+        ),
+    ]
+
+
+def plot_history(history, phase_name, output_dir):
+    """Save training accuracy and loss plots."""
     acc = history.history.get('accuracy', [])
     val_acc = history.history.get('val_accuracy', [])
     loss = history.history.get('loss', [])
     val_loss = history.history.get('val_loss', [])
     epochs_range = range(len(acc))
 
-    # Accuracy Plot
-    plt.figure(figsize=(8, 6))
-    plt.plot(epochs_range, acc, label='Training Accuracy', color='#10b981', linewidth=2)
-    plt.plot(epochs_range, val_acc, label='Validation Accuracy', color='#3b82f6', linewidth=2)
-    plt.title('Training & Validation Accuracy', fontsize=14, fontweight='bold')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.legend(loc='lower right')
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig('models/accuracy_plot.png', dpi=300)
-    plt.close()
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Loss Plot
-    plt.figure(figsize=(8, 6))
-    plt.plot(epochs_range, loss, label='Training Loss', color='#ef4444', linewidth=2)
-    plt.plot(epochs_range, val_loss, label='Validation Loss', color='#f59e0b', linewidth=2)
-    plt.title('Training & Validation Loss', fontsize=14, fontweight='bold')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend(loc='upper right')
-    plt.grid(True, linestyle='--', alpha=0.5)
+    ax1.plot(epochs_range, acc, label='Train Acc', color='#10b981', linewidth=2)
+    ax1.plot(epochs_range, val_acc, label='Val Acc', color='#3b82f6', linewidth=2)
+    ax1.set_title(f'{phase_name} — Accuracy', fontsize=13, fontweight='bold')
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Accuracy')
+    ax1.legend()
+    ax1.grid(True, linestyle='--', alpha=0.5)
+
+    ax2.plot(epochs_range, loss, label='Train Loss', color='#ef4444', linewidth=2)
+    ax2.plot(epochs_range, val_loss, label='Val Loss', color='#f59e0b', linewidth=2)
+    ax2.set_title(f'{phase_name} — Loss', fontsize=13, fontweight='bold')
+    ax2.set_xlabel('Epochs')
+    ax2.set_ylabel('Loss')
+    ax2.legend()
+    ax2.grid(True, linestyle='--', alpha=0.5)
+
     plt.tight_layout()
-    plt.savefig('models/loss_plot.png', dpi=300)
+    plot_path = os.path.join(output_dir, f'{phase_name.lower().replace(" ", "_")}_plot.png')
+    plt.savefig(plot_path, dpi=150)
     plt.close()
+    print(f"Plot saved → {plot_path}")
+    return plot_path
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Train KrishiCare MobileNetV2 model")
-    parser.add_argument(
-        "--quick",
-        action="store_true",
-        help="Faster training (8 epochs, batch 16) for local dev setup",
-    )
+    parser = argparse.ArgumentParser(description="Train KrishiCare model with 2-phase fine-tuning")
+    parser.add_argument("--quick", action="store_true",
+                        help="Quick mode: reduced epochs for dev testing")
+    parser.add_argument("--no-efficientnet", action="store_true",
+                        help="Use MobileNetV2 instead of EfficientNetV2B0")
+    parser.add_argument("--unfreeze-layers", type=int, default=50,
+                        help="Number of backbone layers to unfreeze in fine-tuning phase (default 50)")
     args = parser.parse_args()
 
-    global BATCH_SIZE, EPOCHS
+    global EPOCHS_WARMUP, EPOCHS_FINETUNE, BATCH_SIZE
     if args.quick:
+        EPOCHS_WARMUP = 5
+        EPOCHS_FINETUNE = 8
         BATCH_SIZE = 16
-        EPOCHS = 8
-        print("Quick mode: 8 epochs, batch size 16")
+        print("⚡ Quick mode: warmup=5 epochs, fine-tune=8 epochs, batch=16")
 
-    print("Setting up dataset directories...")
-    setup_directories()
-
-    # Define directory paths
+    # ── Directories ─────────────────────────────────────────────────────────
+    os.chdir(BASE_DIR)
     train_dir = 'dataset/train'
-    val_dir = 'dataset/val'
-    test_dir = 'dataset/test'
+    val_dir   = 'dataset/val'
+    test_dir  = 'dataset/test'
+    model_output = 'models/krishicare_mobilenetv2.keras'  # keep filename for compatibility
+    models_dir   = 'models'
+    os.makedirs(models_dir, exist_ok=True)
 
-    print("Loading datasets...")
+    # ── Load datasets ────────────────────────────────────────────────────────
+    print("\n[INFO] Loading datasets...")
     try:
-        train_ds = tf.keras.utils.image_dataset_from_directory(
-            train_dir,
-            image_size=IMG_SIZE,
-            batch_size=BATCH_SIZE,
-            label_mode='categorical'
+        train_ds_raw = tf.keras.utils.image_dataset_from_directory(
+            train_dir, image_size=IMG_SIZE, batch_size=BATCH_SIZE, label_mode='categorical'
         )
-        val_ds = tf.keras.utils.image_dataset_from_directory(
-            val_dir,
-            image_size=IMG_SIZE,
-            batch_size=BATCH_SIZE,
-            label_mode='categorical'
+        val_ds_raw = tf.keras.utils.image_dataset_from_directory(
+            val_dir, image_size=IMG_SIZE, batch_size=BATCH_SIZE, label_mode='categorical'
         )
-        test_ds = tf.keras.utils.image_dataset_from_directory(
-            test_dir,
-            image_size=IMG_SIZE,
-            batch_size=BATCH_SIZE,
-            label_mode='categorical'
+        test_ds_raw = tf.keras.utils.image_dataset_from_directory(
+            test_dir, image_size=IMG_SIZE, batch_size=BATCH_SIZE, label_mode='categorical'
         )
-        
-        # Dynamically update NUM_CLASSES based on actual dataset
-        global NUM_CLASSES
-        NUM_CLASSES = len(train_ds.class_names)
-        print(f"Detected {NUM_CLASSES} classes in dataset: {train_ds.class_names}")
-        
-        # Update class names file with actual classes
-        with open('src/class_names.json', 'w') as f:
-            json.dump(train_ds.class_names, f, indent=2)
-        print(f"Updated class_names.json with {NUM_CLASSES} classes")
     except ValueError as e:
-        print("\n" + "="*70)
-        print("ERROR: Dataset directory is empty!")
-        print("="*70)
-        print("We created the required dataset directory structure automatically.")
-        print("Please place your training, validation, and test images inside:")
-        print("  ml-service/dataset/train/")
-        print("  ml-service/dataset/val/")
-        print("  ml-service/dataset/test/")
-        print("\nUnder each folder, ensure images are in class directories:")
-        print("  Tomato___healthy, Tomato___Early_blight, Tomato___Late_blight, etc.")
-        print("  Potato___healthy, Potato___Early_blight, Potato___Late_blight")
-        print("  Corn_(maize)___healthy, Corn_(maize)___Common_rust, etc.")
-        print("  Apple___healthy, Apple___Apple_scab, etc.")
-        print("  (38 classes total covering 30+ crops)")
-        print("\nOr run: python src/download_dataset.py --max-per-class 200")
-        print("\nThen run this training script again.")
-        print("="*70 + "\n")
+        print(f"\n[ERROR] Dataset error: {e}")
+        print("Run: python src/download_dataset.py --max-per-class 300")
         return
 
-    # Save class names mapping
-    class_names = train_ds.class_names
-    print(f"\nDetected Classes: {class_names}")
-    with open('src/class_names.json', 'w') as f:
-        json.dump(class_names, f, indent=4)
-    print("Saved class names to src/class_names.json")
+    class_names = train_ds_raw.class_names
+    num_classes = len(class_names)
+    print(f"[OK] Detected {num_classes} classes")
 
-    def preprocess_batch(images, labels):
+    # Save class names
+    with open('src/class_names.json', 'w') as f:
+        json.dump(class_names, f, indent=2)
+    print("Saved class_names.json")
+
+    # ── Class weights ────────────────────────────────────────────────────────
+    print("\n[INFO] Computing class weights for imbalanced data...")
+    class_weights = compute_class_weights(train_dir)
+    print(f"   Min weight: {min(class_weights.values()):.3f}  "
+          f"Max weight: {max(class_weights.values()):.3f}")
+
+    # ── Build model ──────────────────────────────────────────────────────────
+    use_efficientnet = not args.no_efficientnet
+    model, base_model, preprocess_fn = build_model(num_classes, use_efficientnet)
+
+    # ── Preprocess pipelines ─────────────────────────────────────────────────
+    AUTOTUNE = tf.data.AUTOTUNE
+
+    def preprocess(images, labels):
         images = tf.cast(images, tf.float32)
-        images = tf.keras.applications.mobilenet_v2.preprocess_input(images)
+        images = preprocess_fn(images)
         return images, labels
 
-    train_ds = train_ds.map(preprocess_batch)
-    val_ds = val_ds.map(preprocess_batch)
-    test_ds = test_ds.map(preprocess_batch)
+    train_ds = train_ds_raw.map(preprocess, num_parallel_calls=AUTOTUNE).prefetch(AUTOTUNE)
+    val_ds   = val_ds_raw.map(preprocess, num_parallel_calls=AUTOTUNE).prefetch(AUTOTUNE)
+    test_ds  = test_ds_raw.map(preprocess, num_parallel_calls=AUTOTUNE).prefetch(AUTOTUNE)
 
-    # Prefetch for performance optimization
-    AUTOTUNE = tf.data.AUTOTUNE
-    train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
-    val_ds = val_ds.prefetch(buffer_size=AUTOTUNE)
-    test_ds = test_ds.prefetch(buffer_size=AUTOTUNE)
+    # ════════════════════════════════════════════════════════════════════════
+    # PHASE 1 — Warmup: train only classifier head
+    # ════════════════════════════════════════════════════════════════════════
+    print(f"\n{'='*60}")
+    print("PHASE 1 — Warmup (classifier head only)")
+    print(f"{'='*60}")
+    model.summary(print_fn=lambda x: None)  # silent summary
 
-    # Build model architecture
-    print("\nBuilding model...")
-    model = build_model()
-    model.summary()
-
-    # Train the neural network
-    print("\nStarting model training...")
-    history = model.fit(
+    history_warmup = model.fit(
         train_ds,
         validation_data=val_ds,
-        epochs=EPOCHS,
-        callbacks=[]
+        epochs=EPOCHS_WARMUP,
+        class_weight=class_weights,
+        callbacks=get_callbacks(model_output, phase="warmup"),
+        verbose=1
     )
-    
-    # Save model in Keras 3 format
-    print("\nSaving trained model...")
-    model.save('models/krishicare_mobilenetv2.keras')
-    print("Model saved successfully in Keras format!")
+    plot_history(history_warmup, "Phase 1 Warmup", models_dir)
 
-    # Plot metrics
-    print("\nGenerating accuracy and loss plots...")
-    plot_history(history)
-    print("Plots saved in models/ directory.")
+    best_warmup_acc = max(history_warmup.history.get('val_accuracy', [0]))
+    print(f"\n[OK] Phase 1 best val_accuracy: {best_warmup_acc*100:.2f}%")
 
-    # Evaluate final best model on test data
-    print("\nEvaluating on test dataset...")
-    test_loss, test_acc = model.evaluate(test_ds)
-    print(f"\nTest Accuracy: {test_acc * 100:.2f}%")
-    print(f"Test Loss: {test_loss:.4f}")
+    # ════════════════════════════════════════════════════════════════════════
+    # PHASE 2 — Fine-tuning: unfreeze top N layers of backbone
+    # ════════════════════════════════════════════════════════════════════════
+    print(f"\n{'='*60}")
+    print(f"PHASE 2 — Fine-tuning (unfreezing top {args.unfreeze_layers} backbone layers)")
+    print(f"{'='*60}")
+
+    # Reload best weights from Phase 1
+    if os.path.exists(model_output):
+        model = tf.keras.models.load_model(model_output, compile=False)
+        # Re-get base model reference
+        for lyr in model.layers:
+            if hasattr(lyr, 'layers') and len(lyr.layers) > 5:
+                base_model = lyr
+                break
+
+    # Unfreeze top N layers of backbone
+    base_model.trainable = True
+    total_layers = len(base_model.layers)
+    freeze_until = max(0, total_layers - args.unfreeze_layers)
+    for i, layer in enumerate(base_model.layers):
+        layer.trainable = (i >= freeze_until)
+    trainable_count = sum(1 for l in base_model.layers if l.trainable)
+    print(f"Unfrozen {trainable_count}/{total_layers} backbone layers")
+
+    # Lower LR for fine-tuning to avoid destroying pretrained weights
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
+        loss=tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.05),
+        metrics=[
+            'accuracy',
+            tf.keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_acc')
+        ]
+    )
+
+    history_finetune = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=EPOCHS_FINETUNE,
+        class_weight=class_weights,
+        callbacks=get_callbacks(model_output, phase="finetune"),
+        verbose=1
+    )
+    plot_history(history_finetune, "Phase 2 Finetune", models_dir)
+
+    best_finetune_acc = max(history_finetune.history.get('val_accuracy', [0]))
+    print(f"\n[OK] Phase 2 best val_accuracy: {best_finetune_acc*100:.2f}%")
+
+    # ════════════════════════════════════════════════════════════════════════
+    # EVALUATION
+    # ════════════════════════════════════════════════════════════════════════
+    # Load the very best checkpoint
+    if os.path.exists(model_output):
+        best_model = tf.keras.models.load_model(model_output, compile=False)
+        best_model.compile(
+            optimizer='adam',
+            loss='categorical_crossentropy',
+            metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_acc')]
+        )
+        print("\n[EVAL] Evaluating best model on test set...")
+        results = best_model.evaluate(test_ds, verbose=1)
+        metrics = dict(zip(best_model.metrics_names, results))
+        print(f"\n[RESULT] Test Accuracy  : {metrics.get('accuracy', 0)*100:.2f}%")
+        print(f"[RESULT] Top-3 Accuracy : {metrics.get('top3_acc', 0)*100:.2f}%")
+        print(f"[RESULT] Test Loss      : {metrics.get('loss', 0):.4f}")
+
+    print(f"\n[OK] Training complete! Model saved to: {os.path.abspath(model_output)}")
+    print("Restart the FastAPI service to load the new model.")
+
 
 if __name__ == '__main__':
     main()

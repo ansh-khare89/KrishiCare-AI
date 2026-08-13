@@ -10,76 +10,97 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-MODEL_VERSION = "mobilenetv2-v2"
+MODEL_VERSION = "efficientnetv2b0-v3"
 
-# Resolve paths relative to the directory containing main.py
+# Confidence threshold: if best prediction < this value, flag as uncertain
+CONFIDENCE_THRESHOLD = 35.0   # percent
+
+# Resolve paths relative to this file
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH_KERAS = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2.keras')
-MODEL_PATH_H5 = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2.h5')
-MODEL_PATH_SAVED = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2')
-CLASS_NAMES_PATH = os.path.join(BASE_DIR, 'src', 'class_names.json')
+MODEL_PATH_KERAS  = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2.keras')
+MODEL_PATH_H5     = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2.h5')
+MODEL_PATH_SAVED  = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2')
+CLASS_NAMES_PATH  = os.path.join(BASE_DIR, 'src', 'class_names.json')
 
-model = None
+model       = None
 class_names = None
+# Track which backbone preprocessing to use
+is_efficientnet = False
 
-def make_readable(class_name):
-    """Convert raw dataset folder names to beautiful, user-friendly labels."""
+
+def make_readable(class_name: str) -> str:
+    """Convert raw dataset folder names to human-friendly labels."""
     parts = class_name.split('___')
     if len(parts) == 2:
-        crop = parts[0]
+        crop    = parts[0].replace('_', ' ').replace('(', '').replace(')', '').strip()
         disease = parts[1].replace('_', ' ').title()
-        return f"{crop} ({disease})"
-    return class_name.replace('___', ' - ').replace('_', ' ')
+        return f"{crop} — {disease}"
+    return class_name.replace('___', ' — ').replace('_', ' ')
+
 
 def load_model_and_classes():
-    """Load the model and class mapping if not already loaded."""
-    global model, class_names
+    """Load model and class mapping if not already loaded."""
+    global model, class_names, is_efficientnet
     if model is not None and class_names is not None:
         return True
 
-    print("Loading model and classes dynamically...")
-    # Try loading model from Keras format first, then H5, then SavedModel
+    print("Loading model and classes...")
     for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
         if os.path.exists(model_path):
             try:
-                print(f"Loading trained MobileNetV2 model from {model_path}...")
+                print(f"Loading model from {model_path} ...")
                 model = tf.keras.models.load_model(
                     model_path,
                     compile=False,
                     safe_mode=False,
                 )
-                print(f"Model loaded successfully from {model_path}")
+                # Detect backbone type from model name
+                model_name = getattr(model, 'name', '').lower()
+                is_efficientnet = 'efficient' in model_name
+                print(f"Model '{model.name}' loaded. EfficientNet mode: {is_efficientnet}")
                 break
             except Exception as e:
-                print(f"Error loading model from {model_path}: {e}")
+                print(f"Error loading {model_path}: {e}")
                 continue
 
     if os.path.exists(CLASS_NAMES_PATH):
         try:
             with open(CLASS_NAMES_PATH, 'r') as f:
                 class_names = json.load(f)
-            print(f"Loaded {len(class_names)} class names from {CLASS_NAMES_PATH}")
+            print(f"Loaded {len(class_names)} class names.")
         except Exception as e:
             print(f"Error loading class names: {e}")
             class_names = None
 
     return model is not None and class_names is not None
 
+
+def preprocess_image(img: Image.Image) -> np.ndarray:
+    """Resize and preprocess a PIL image to match training pipeline."""
+    img_resized = img.resize((224, 224))
+    img_array   = np.array(img_resized, dtype=np.float32)
+    if is_efficientnet:
+        img_array = tf.keras.applications.efficientnet_v2.preprocess_input(img_array)
+    else:
+        img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
+    return np.expand_dims(img_array, axis=0)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Pre-load ML model and class labels at application startup."""
-    print(f"Starting ML Service - Model Version: {MODEL_VERSION}")
+    print(f"Starting ML Service — Model Version: {MODEL_VERSION}")
     load_model_and_classes()
     yield
 
+
 app = FastAPI(
     title="KrishiCare AI ML Microservice",
-    description="Dedicated microservice exposing MobileNetV2 crop health predictions.",
-    version="1.0.0",
+    description="MobileNetV2/EfficientNetV2 crop disease prediction service.",
+    version="2.0.0",
     lifespan=lifespan
 )
 
-# Enable CORS — allow all origins for internal Render service-to-service calls
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -88,6 +109,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 @app.get("/health")
 def health_check():
@@ -95,57 +117,87 @@ def health_check():
         "status": "healthy",
         "service": "KrishiCare AI ML Service",
         "model_loaded": model is not None,
-        "model_version": MODEL_VERSION
+        "model_version": MODEL_VERSION,
+        "num_classes": len(class_names) if class_names else 0,
+        "confidence_threshold": CONFIDENCE_THRESHOLD,
     }
+
 
 @app.get("/ping")
 def ping():
-    """Lightweight endpoint for keep-alive pings to prevent Render sleep."""
+    """Lightweight keep-alive endpoint."""
     return {
         "status": "pong",
         "service": "KrishiCare AI ML Service",
         "timestamp": str(time.time())
     }
 
-def run_inference(img_batch, class_idx=None, explain=False):
+
+@app.get("/classes")
+def get_classes():
+    """Return all supported class names."""
+    if not class_names:
+        raise HTTPException(status_code=503, detail="Model not loaded.")
+    return {
+        "count": len(class_names),
+        "classes": [
+            {"raw": cn, "readable": make_readable(cn)}
+            for cn in class_names
+        ]
+    }
+
+
+def run_inference(img_batch, explain: bool = False) -> dict:
     predictions = model.predict(img_batch, verbose=0)
-    score = predictions[0]
-    top_indices = np.argsort(score)[::-1][:3]
+    score       = predictions[0]
+    top_indices = np.argsort(score)[::-1][:5]   # top-5
 
     top_predictions = []
     for idx in top_indices:
         raw = class_names[int(idx)]
         top_predictions.append({
-            "class": raw,
+            "class":          raw,
             "readable_class": make_readable(raw),
-            "confidence": round(float(score[idx] * 100), 2)
+            "confidence":     round(float(score[idx] * 100), 2),
         })
 
     best = top_predictions[0]
+    is_low_confidence = best["confidence"] < CONFIDENCE_THRESHOLD
+
     result = {
-        "class": best["class"],
-        "readable_class": best["readable_class"],
-        "confidence": best["confidence"],
-        "model_version": MODEL_VERSION,
-        "top_predictions": top_predictions
+        "class":             best["class"],
+        "readable_class":    best["readable_class"],
+        "confidence":        best["confidence"],
+        "model_version":     MODEL_VERSION,
+        "top_predictions":   top_predictions,
+        "low_confidence":    is_low_confidence,
+        # Warn when model is uncertain
+        "warning": (
+            "Low confidence — image may not be a plant leaf or disease is not in training set."
+            if is_low_confidence else None
+        ),
     }
 
     if explain:
-        from src.gradcam import generate_gradcam_overlay
-        idx = class_idx if class_idx is not None else int(top_indices[0])
-        heatmap = generate_gradcam_overlay(model, img_batch, idx)
-        if heatmap:
-            result["heatmap_base64"] = heatmap
+        try:
+            from src.gradcam import generate_gradcam_overlay
+            idx     = int(top_indices[0])
+            heatmap = generate_gradcam_overlay(model, img_batch, idx)
+            if heatmap:
+                result["heatmap_base64"] = heatmap
+        except Exception as e:
+            result["gradcam_error"] = str(e)
 
     return result
 
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...), explain: bool = False):
-    """Perform crop disease prediction on uploaded leaf image."""
+    """Perform crop disease prediction on an uploaded leaf image."""
     if not load_model_and_classes():
         raise HTTPException(
-            status_code=503, 
-            detail="ML model is not loaded. Please train the model before requesting predictions."
+            status_code=503,
+            detail="ML model is not loaded. Train the model first."
         )
 
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -153,14 +205,15 @@ async def predict(file: UploadFile = File(...), explain: bool = False):
 
     try:
         contents = await file.read()
-        img = Image.open(io.BytesIO(contents)).convert('RGB')
-        img_resized = img.resize((224, 224))
-        img_array = np.array(img_resized, dtype=np.float32)
-        img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
-        img_batch = np.expand_dims(img_array, axis=0)
+        img      = Image.open(io.BytesIO(contents)).convert('RGB')
+        img_batch = preprocess_image(img)
 
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, lambda: run_inference(img_batch, explain=explain))
+        return await loop.run_in_executor(
+            None, lambda: run_inference(img_batch, explain=explain)
+        )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
