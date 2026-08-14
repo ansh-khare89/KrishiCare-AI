@@ -6,6 +6,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -20,7 +21,14 @@ public class MlPredictionService {
     @Value("${ml.service.url:http://localhost:8000}")
     private String mlServiceUrl;
 
-    private final RestClient restClient = RestClient.builder().build();
+    private final RestClient restClient;
+
+    public MlPredictionService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(30000);
+        factory.setReadTimeout(60000);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
+    }
 
     @SuppressWarnings("unchecked")
     public Map<String, Object> predictCropDisease(MultipartFile file, boolean explain) throws IOException {

@@ -125,14 +125,14 @@ export async function fetchWeatherAdvisory(city = 'New Delhi') {
   })
 }
 
-// Wake up service by pinging it
+// Wake up backend and ML service by pinging ML wake-up endpoint
 export async function wakeUpService() {
   try {
-    await api.get('/api/ping', { timeout: 10000 })
-    return true
+    const { data } = await api.get('/api/ml/wakeup', { timeout: 20000 })
+    return data
   } catch (error) {
     console.log('Service wake-up ping failed:', error.message)
-    return false
+    return { success: false, message: error.message }
   }
 }
 

@@ -1,4 +1,6 @@
 import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import io
 import json
 import time
@@ -22,8 +24,10 @@ MODEL_PATH_H5     = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2.h5'
 MODEL_PATH_SAVED  = os.path.join(BASE_DIR, 'models', 'krishicare_mobilenetv2')
 CLASS_NAMES_PATH  = os.path.join(BASE_DIR, 'src', 'class_names.json')
 
-model       = None
-class_names = None
+model         = None
+class_names   = None
+model_loading = False
+load_error    = None
 # Track which backbone preprocessing to use
 is_efficientnet = False
 
@@ -40,37 +44,43 @@ def make_readable(class_name: str) -> str:
 
 def load_model_and_classes():
     """Load model and class mapping if not already loaded."""
-    global model, class_names, is_efficientnet
+    global model, class_names, is_efficientnet, model_loading, load_error
     if model is not None and class_names is not None:
         return True
 
-    print("Loading model and classes...")
-    for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
-        if os.path.exists(model_path):
-            try:
-                print(f"Loading model from {model_path} ...")
-                model = tf.keras.models.load_model(
-                    model_path,
-                    compile=False,
-                    safe_mode=False,
-                )
-                # Detect backbone type from model name
-                model_name = getattr(model, 'name', '').lower()
-                is_efficientnet = 'efficient' in model_name
-                print(f"Model '{model.name}' loaded. EfficientNet mode: {is_efficientnet}")
-                break
-            except Exception as e:
-                print(f"Error loading {model_path}: {e}")
-                continue
+    model_loading = True
+    load_error = None
+    try:
+        print("Loading model and classes...")
+        for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
+            if os.path.exists(model_path):
+                try:
+                    print(f"Loading model from {model_path} ...")
+                    model = tf.keras.models.load_model(
+                        model_path,
+                        compile=False,
+                        safe_mode=False,
+                    )
+                    # Detect backbone type from model name
+                    model_name = getattr(model, 'name', '').lower()
+                    is_efficientnet = 'efficient' in model_name
+                    print(f"Model '{model.name}' loaded. EfficientNet mode: {is_efficientnet}")
+                    break
+                except Exception as e:
+                    print(f"Error loading {model_path}: {e}")
+                    load_error = str(e)
+                    continue
 
-    if os.path.exists(CLASS_NAMES_PATH):
-        try:
-            with open(CLASS_NAMES_PATH, 'r') as f:
-                class_names = json.load(f)
-            print(f"Loaded {len(class_names)} class names.")
-        except Exception as e:
-            print(f"Error loading class names: {e}")
-            class_names = None
+        if os.path.exists(CLASS_NAMES_PATH):
+            try:
+                with open(CLASS_NAMES_PATH, 'r') as f:
+                    class_names = json.load(f)
+                print(f"Loaded {len(class_names)} class names.")
+            except Exception as e:
+                print(f"Error loading class names: {e}")
+                class_names = None
+    finally:
+        model_loading = False
 
     return model is not None and class_names is not None
 
@@ -88,9 +98,10 @@ def preprocess_image(img: Image.Image) -> np.ndarray:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Pre-load ML model and class labels at application startup."""
+    """Pre-load ML model asynchronously so server binds port 8000 instantly."""
     print(f"Starting ML Service — Model Version: {MODEL_VERSION}")
-    load_model_and_classes()
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, load_model_and_classes)
     yield
 
 
@@ -117,6 +128,8 @@ def health_check():
         "status": "healthy",
         "service": "KrishiCare AI ML Service",
         "model_loaded": model is not None,
+        "model_loading": model_loading,
+        "load_error": load_error,
         "model_version": MODEL_VERSION,
         "num_classes": len(class_names) if class_names else 0,
         "confidence_threshold": CONFIDENCE_THRESHOLD,
@@ -194,6 +207,12 @@ def run_inference(img_batch, explain: bool = False) -> dict:
 @app.post("/predict")
 async def predict(file: UploadFile = File(...), explain: bool = False):
     """Perform crop disease prediction on an uploaded leaf image."""
+    if model_loading:
+        raise HTTPException(
+            status_code=503,
+            detail="ML model is waking up and loading into memory. Please try again in a few seconds."
+        )
+
     if not load_model_and_classes():
         raise HTTPException(
             status_code=503,

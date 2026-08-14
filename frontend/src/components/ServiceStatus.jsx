@@ -22,7 +22,9 @@ export default function ServiceStatus() {
     }
 
     check()
-    const interval = setInterval(check, 30000)
+    // Poll more frequently if ML service is loading or unreachable
+    const pollInterval = status?.mlService?.modelLoading ? 5000 : 15000
+    const interval = setInterval(check, pollInterval)
 
     const keepAlive = setInterval(async () => {
       if (active) {
@@ -35,7 +37,7 @@ export default function ServiceStatus() {
       clearInterval(interval)
       clearInterval(keepAlive)
     }
-  }, [])
+  }, [status?.mlService?.modelLoading])
 
   const handleWakeUp = async () => {
     setWakingUp(true)
@@ -59,13 +61,16 @@ export default function ServiceStatus() {
   }
 
   const mlReady = status?.mlService?.modelLoaded
+  const mlLoading = status?.mlService?.modelLoading
   const backendOk = status?.status === 'healthy'
   const mlStatus = status?.mlService?.status
   const mlMessage = mlReady
     ? 'ready'
-    : mlStatus === 'unreachable'
-      ? 'offline — waking up…'
-      : 'loading model…'
+    : mlLoading
+      ? 'loading model into memory…'
+      : mlStatus === 'unreachable'
+        ? 'offline — tap Wake Up'
+        : 'initializing…'
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-leaf-100 bg-white/80 px-4 py-2 text-sm dark:border-earth-700 dark:bg-earth-900/80">
