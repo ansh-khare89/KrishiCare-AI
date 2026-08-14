@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Leaf, Loader2, RefreshCw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { AlertTriangle, ChevronLeft, ChevronRight, Leaf, Loader2, Lock, LogIn, RefreshCw, UserPlus } from 'lucide-react'
 import { fetchPredictionHistory, resolveImageUrl } from '../api/client'
 import { SkeletonCard } from '../components/Skeleton'
 import { confidenceColor, isHealthy } from '../utils/prediction'
+import { useAuth } from '../context/AuthContext'
 
 function HistoryCard({ item }) {
   const healthy = isHealthy(item.diseaseName)
@@ -49,12 +51,17 @@ function HistoryCard({ item }) {
 }
 
 export default function HistoryPage() {
+  const { isAuthenticated, user } = useAuth()
   const [data, setData] = useState(null)
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const loadHistory = async (targetPage = page) => {
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
     try {
@@ -69,7 +76,42 @@ export default function HistoryPage() {
 
   useEffect(() => {
     loadHistory(page)
-  }, [page])
+  }, [page, isAuthenticated])
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-lg py-12 text-center">
+        <div className="rounded-3xl border border-leaf-200/80 bg-white/90 p-8 shadow-xl backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/90 sm:p-10">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-leaf-600 to-emerald-500 text-white shadow-lg shadow-leaf-600/30">
+            <Lock className="h-8 w-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-earth-900 dark:text-earth-50 sm:text-3xl">
+            Sign in to view your history
+          </h2>
+          <p className="mt-3 text-sm text-earth-700/80 dark:text-earth-300 leading-relaxed">
+            Your diagnosis history and recommended treatments are saved to your personal account. Sign in to review your past scans.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link
+              to="/auth?tab=login&redirect=/history"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-leaf-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-leaf-600/25 transition hover:bg-leaf-700 active:scale-95"
+            >
+              <LogIn className="h-4 w-4" />
+              <span>Sign In</span>
+            </Link>
+            <Link
+              to="/auth?tab=register&redirect=/history"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-leaf-200 bg-white px-6 py-3 text-sm font-semibold text-leaf-700 shadow-sm transition hover:bg-leaf-50 dark:border-earth-700 dark:bg-earth-900 dark:text-leaf-300"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Create Account</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -77,7 +119,7 @@ export default function HistoryPage() {
         <div>
           <h1 className="text-3xl font-bold text-earth-900 dark:text-earth-50">Your diagnoses</h1>
           <p className="mt-2 text-earth-700/70 dark:text-earth-400">
-            Past results from this browser session.
+            Personal diagnosis history for <span className="font-semibold text-leaf-700 dark:text-leaf-300">{user?.email}</span>
           </p>
         </div>
 

@@ -6,7 +6,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "prediction_history", indexes = {
         @Index(name = "idx_prediction_timestamp", columnList = "timestamp"),
-        @Index(name = "idx_prediction_session", columnList = "session_id")
+        @Index(name = "idx_prediction_session", columnList = "session_id"),
+        @Index(name = "idx_prediction_user_id", columnList = "user_id")
 })
 public class PredictionHistory {
 
@@ -16,6 +17,9 @@ public class PredictionHistory {
 
     @Column(name = "session_id", nullable = false, length = 64)
     private String sessionId;
+
+    @Column(name = "user_id")
+    private Long userId;
 
     @Column(name = "image_url", nullable = false)
     private String imageUrl;
@@ -54,6 +58,9 @@ public class PredictionHistory {
 
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, ScanSearch, CloudSun, Droplet, Thermometer, Search, AlertCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Loader2, ScanSearch, CloudSun, Droplet, Thermometer, Search, AlertCircle, Lock, Sparkles, UserPlus, LogIn, ArrowRight } from 'lucide-react'
 import heroImg from '../assets/hero.png'
 import ImageUpload from '../components/ImageUpload'
 import PredictionResult from '../components/PredictionResult'
 import { SkeletonResult } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { predictCropHealth, predictBatch, fetchWeatherAdvisory } from '../api/client'
+import { useAuth } from '../context/AuthContext'
+
 
 const POPULAR_CITIES = [
   { value: 'New Delhi', label: 'New Delhi (NCR)' },
@@ -34,6 +37,7 @@ const POPULAR_CITIES = [
 
 export default function HomePage() {
   const { push } = useToast()
+  const { isAuthenticated, user } = useAuth()
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -107,6 +111,12 @@ export default function HomePage() {
   }
 
   const handleAnalyze = async () => {
+    if (!isAuthenticated) {
+      setError('Please sign in or create an account to diagnose crop leaves.')
+      push('Sign in required to run diagnosis', 'error')
+      return
+    }
+
     if (batchMode) {
       if (batchFiles.length === 0) return
       setLoading(true)
@@ -278,88 +288,139 @@ export default function HomePage() {
       </section>
 
       <section className="rounded-3xl border border-leaf-200/60 bg-white/80 p-6 shadow-md backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/60 sm:p-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-earth-900 dark:text-earth-50">Upload leaf</h2>
-          <div className="flex gap-2 rounded-xl bg-earth-50 p-1 dark:bg-earth-800">
-            <button
-              type="button"
-              onClick={() => setBatchMode(false)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${!batchMode ? 'bg-white shadow dark:bg-earth-900' : ''}`}
-            >
-              Single
-            </button>
-            <button
-              type="button"
-              onClick={() => setBatchMode(true)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${batchMode ? 'bg-white shadow dark:bg-earth-900' : ''}`}
-            >
-              Batch
-            </button>
-          </div>
-        </div>
+        {!isAuthenticated ? (
+          <div className="py-6 text-center sm:py-8">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-leaf-600 to-emerald-500 text-white shadow-lg shadow-leaf-600/30">
+              <Lock className="h-8 w-8" />
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-earth-900 dark:text-earth-50 sm:text-3xl">
+              Sign in to scan & diagnose crops
+            </h2>
+            <p className="mx-auto mt-2 max-w-lg text-base text-earth-700/80 dark:text-earth-300">
+              Create a free account or log in to run AI disease predictions and save your diagnostic history permanently across all your devices.
+            </p>
 
-        {!batchMode ? (
-          <>
-            <ImageUpload
-              file={file}
-              preview={preview}
-              onFileSelect={handleFileSelect}
-              onClear={handleClear}
-              disabled={loading}
-            />
-            <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-earth-700 dark:text-earth-300">
-              <input
-                type="checkbox"
-                checked={explain}
-                onChange={(e) => setExplain(e.target.checked)}
-                className="rounded border-leaf-300"
-              />
-              Show Grad-CAM heatmap (slower)
-            </label>
-          </>
+            <div className="mx-auto mt-8 flex max-w-sm flex-col gap-3 sm:flex-row sm:justify-center">
+              <Link
+                to="/auth?tab=login&redirect=/"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-leaf-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-leaf-600/25 transition hover:bg-leaf-700 active:scale-95"
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Sign In to Scan</span>
+              </Link>
+              <Link
+                to="/auth?tab=register&redirect=/"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-leaf-200 bg-white px-6 py-3 text-sm font-semibold text-leaf-700 shadow-sm transition hover:bg-leaf-50 dark:border-earth-700 dark:bg-earth-900 dark:text-leaf-300"
+              >
+                <UserPlus className="h-4 w-4" />
+                <span>Create Free Account</span>
+              </Link>
+            </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3 text-left border-t border-leaf-100 pt-6 dark:border-earth-800">
+              <div className="flex items-start gap-2 text-xs text-earth-700 dark:text-earth-300">
+                <Sparkles className="h-4 w-4 text-leaf-600 dark:text-leaf-400 shrink-0 mt-0.5" />
+                <span>Fast AI leaf diagnosis for 30+ crops</span>
+              </div>
+              <div className="flex items-start gap-2 text-xs text-earth-700 dark:text-earth-300">
+                <Sparkles className="h-4 w-4 text-leaf-600 dark:text-leaf-400 shrink-0 mt-0.5" />
+                <span>Permanent scan & treatment history</span>
+              </div>
+              <div className="flex items-start gap-2 text-xs text-earth-700 dark:text-earth-300">
+                <Sparkles className="h-4 w-4 text-leaf-600 dark:text-leaf-400 shrink-0 mt-0.5" />
+                <span>Personalized analytics & insights</span>
+              </div>
+            </div>
+          </div>
         ) : (
-          <div>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              disabled={loading}
-              onChange={(e) => setBatchFiles(Array.from(e.target.files || []))}
-              className="block w-full text-sm text-earth-600 file:mr-4 file:rounded-lg file:border-0 file:bg-leaf-600 file:px-4 file:py-2 file:text-white"
-            />
-            {batchFiles.length > 0 && (
-              <p className="mt-2 text-sm text-earth-600 dark:text-earth-400">
-                {batchFiles.length} file(s) selected
-              </p>
-            )}
-          </div>
-        )}
+          <>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-earth-900 dark:text-earth-50">Upload leaf</h2>
+                <p className="text-xs text-earth-600 dark:text-earth-400">Logged in as {user?.name || user?.email}</p>
+              </div>
+              <div className="flex gap-2 rounded-xl bg-earth-50 p-1 dark:bg-earth-800">
+                <button
+                  type="button"
+                  onClick={() => setBatchMode(false)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${!batchMode ? 'bg-white shadow dark:bg-earth-900' : ''}`}
+                >
+                  Single
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBatchMode(true)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${batchMode ? 'bg-white shadow dark:bg-earth-900' : ''}`}
+                >
+                  Batch
+                </button>
+              </div>
+            </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-4">
-          <button
-            type="button"
-            onClick={handleAnalyze}
-            disabled={loading || (batchMode ? batchFiles.length === 0 : !file)}
-            className="inline-flex items-center gap-2 rounded-xl bg-leaf-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-leaf-600/30 transition hover:bg-leaf-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? (
+            {!batchMode ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Running model…
+                <ImageUpload
+                  file={file}
+                  preview={preview}
+                  onFileSelect={handleFileSelect}
+                  onClear={handleClear}
+                  disabled={loading}
+                />
+                <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-earth-700 dark:text-earth-300">
+                  <input
+                    type="checkbox"
+                    checked={explain}
+                    onChange={(e) => setExplain(e.target.checked)}
+                    className="rounded border-leaf-300"
+                  />
+                  Show Grad-CAM heatmap (slower)
+                </label>
               </>
             ) : (
-              <>
-                <ScanSearch className="h-4 w-4" />
-                Analyze
-              </>
+              <div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  disabled={loading}
+                  onChange={(e) => setBatchFiles(Array.from(e.target.files || []))}
+                  className="block w-full text-sm text-earth-600 file:mr-4 file:rounded-lg file:border-0 file:bg-leaf-600 file:px-4 file:py-2 file:text-white"
+                />
+                {batchFiles.length > 0 && (
+                  <p className="mt-2 text-sm text-earth-600 dark:text-earth-400">
+                    {batchFiles.length} file(s) selected
+                  </p>
+                )}
+              </div>
             )}
-          </button>
-          {file && !loading && (
-            <button type="button" onClick={handleClear} className="text-sm text-earth-700 dark:text-earth-300">
-              Clear
-            </button>
-          )}
-        </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={handleAnalyze}
+                disabled={loading || (batchMode ? batchFiles.length === 0 : !file)}
+                className="inline-flex items-center gap-2 rounded-xl bg-leaf-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-leaf-600/30 transition hover:bg-leaf-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Running model…
+                  </>
+                ) : (
+                  <>
+                    <ScanSearch className="h-4 w-4" />
+                    Analyze
+                  </>
+                )}
+              </button>
+              {file && !loading && (
+                <button type="button" onClick={handleClear} className="text-sm text-earth-700 dark:text-earth-300">
+                  Clear
+                </button>
+              )}
+            </div>
+          </>
+        )}
 
         {error && (
           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">

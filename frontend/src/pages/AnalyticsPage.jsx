@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, Leaf, ShieldAlert } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BarChart3, Leaf, Lock, LogIn, ShieldAlert, UserPlus } from 'lucide-react'
 import { fetchAnalytics } from '../api/client'
 import { SkeletonCard } from '../components/Skeleton'
+import { useAuth } from '../context/AuthContext'
 
 function StatCard({ label, value, icon: Icon, color }) {
   return (
@@ -16,14 +18,55 @@ function StatCard({ label, value, icon: Icon, color }) {
 }
 
 export default function AnalyticsPage() {
+  const { isAuthenticated, user } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
+    setLoading(true)
     fetchAnalytics()
       .then(setData)
       .finally(() => setLoading(false))
-  }, [])
+  }, [isAuthenticated])
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-lg py-12 text-center">
+        <div className="rounded-3xl border border-leaf-200/80 bg-white/90 p-8 shadow-xl backdrop-blur-xl dark:border-earth-700 dark:bg-earth-900/90 sm:p-10">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-leaf-600 to-emerald-500 text-white shadow-lg shadow-leaf-600/30">
+            <Lock className="h-8 w-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-earth-900 dark:text-earth-50 sm:text-3xl">
+            Sign in to view your dashboard
+          </h2>
+          <p className="mt-3 text-sm text-earth-700/80 dark:text-earth-300 leading-relaxed">
+            Track your crop health statistics, disease distribution, and scan trends saved to your account.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link
+              to="/auth?tab=login&redirect=/dashboard"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-leaf-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-leaf-600/25 transition hover:bg-leaf-700 active:scale-95"
+            >
+              <LogIn className="h-4 w-4" />
+              <span>Sign In</span>
+            </Link>
+            <Link
+              to="/auth?tab=register&redirect=/dashboard"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-leaf-200 bg-white px-6 py-3 text-sm font-semibold text-leaf-700 shadow-sm transition hover:bg-leaf-50 dark:border-earth-700 dark:bg-earth-900 dark:text-leaf-300"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Create Account</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -41,7 +84,9 @@ export default function AnalyticsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-earth-900 dark:text-earth-50">Dashboard</h1>
-        <p className="mt-2 text-earth-600 dark:text-earth-400">Your session stats at a glance.</p>
+        <p className="mt-2 text-earth-600 dark:text-earth-400">
+          Analytics for <span className="font-semibold text-leaf-700 dark:text-leaf-300">{user?.email}</span>
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

@@ -62,6 +62,12 @@ public class AuthService {
         return tokensFor(user);
     }
 
+    public com.krishicare.backend.dto.UserProfile getProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("User not found."));
+        return new com.krishicare.backend.dto.UserProfile(user.getId(), user.getEmail(), user.getName());
+    }
+
     private AuthResponse tokensFor(User user) {
         return new AuthResponse(
                 jwtService.generateAccessToken(user.getId(), user.getEmail()),

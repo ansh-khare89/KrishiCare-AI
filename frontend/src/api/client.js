@@ -32,9 +32,13 @@ const api = axios.create({
   timeout: 45000, // 45 second timeout (increased for Render wake-up)
 })
 
-// Add request interceptor for debugging
+// Add request interceptor for auth and debugging
 api.interceptors.request.use(
   (config) => {
+    const token = localStorage.getItem('krishi_access_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.params || '')
     return config
   },
@@ -125,6 +129,22 @@ export async function fetchWeatherAdvisory(city = 'New Delhi') {
   })
 }
 
+// Auth API methods
+export async function loginUser(email, password) {
+  const { data } = await api.post('/api/auth/login', { email, password })
+  return data
+}
+
+export async function registerUser(name, email, password) {
+  const { data } = await api.post('/api/auth/register', { name, email, password })
+  return data
+}
+
+export async function fetchCurrentUser() {
+  const { data } = await api.get('/api/auth/me')
+  return data
+}
+
 // Wake up backend and ML service by pinging ML wake-up endpoint
 export async function wakeUpService() {
   try {
@@ -137,3 +157,4 @@ export async function wakeUpService() {
 }
 
 export default api
+

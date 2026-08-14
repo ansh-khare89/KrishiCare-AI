@@ -1,5 +1,6 @@
 package com.krishicare.backend.controller;
 
+import com.krishicare.backend.config.JwtAuthFilter;
 import com.krishicare.backend.config.SessionFilter;
 import com.krishicare.backend.dto.AnalyticsResponse;
 import com.krishicare.backend.dto.PredictionResponse;
@@ -36,7 +37,8 @@ public class CropController {
             HttpServletRequest request) throws IOException {
         ImageValidator.validate(file);
         String sessionId = (String) request.getAttribute(SessionFilter.SESSION_ATTR);
-        return ResponseEntity.ok(predictionService.processPrediction(file, sessionId, explain));
+        Long userId = (Long) request.getAttribute(JwtAuthFilter.USER_ID_ATTR);
+        return ResponseEntity.ok(predictionService.processPrediction(file, sessionId, userId, explain));
     }
 
     @PostMapping("/predict/batch")
@@ -45,28 +47,32 @@ public class CropController {
             @RequestParam("images") List<MultipartFile> images,
             HttpServletRequest request) throws IOException {
         String sessionId = (String) request.getAttribute(SessionFilter.SESSION_ATTR);
+        Long userId = (Long) request.getAttribute(JwtAuthFilter.USER_ID_ATTR);
         List<PredictionResponse> results = new ArrayList<>();
         for (MultipartFile file : images) {
             ImageValidator.validate(file);
-            results.add(predictionService.processPrediction(file, sessionId, false));
+            results.add(predictionService.processPrediction(file, sessionId, userId, false));
         }
         return ResponseEntity.ok(results);
     }
 
     @GetMapping("/history")
-    @Operation(summary = "Get paginated prediction history for current session")
+    @Operation(summary = "Get paginated prediction history for current user or session")
     public ResponseEntity<?> getHistoryLog(
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
         String sessionId = (String) request.getAttribute(SessionFilter.SESSION_ATTR);
-        return ResponseEntity.ok(predictionService.getPredictionHistory(sessionId, page, size));
+        Long userId = (Long) request.getAttribute(JwtAuthFilter.USER_ID_ATTR);
+        return ResponseEntity.ok(predictionService.getPredictionHistory(sessionId, userId, page, size));
     }
 
     @GetMapping("/analytics")
-    @Operation(summary = "Dashboard stats for current session")
+    @Operation(summary = "Dashboard stats for current user or session")
     public ResponseEntity<AnalyticsResponse> getAnalytics(HttpServletRequest request) {
         String sessionId = (String) request.getAttribute(SessionFilter.SESSION_ATTR);
-        return ResponseEntity.ok(analyticsService.getSessionAnalytics(sessionId));
+        Long userId = (Long) request.getAttribute(JwtAuthFilter.USER_ID_ATTR);
+        return ResponseEntity.ok(analyticsService.getAnalytics(sessionId, userId));
     }
 }
+

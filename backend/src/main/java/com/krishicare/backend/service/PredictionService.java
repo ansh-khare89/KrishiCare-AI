@@ -36,7 +36,7 @@ public class PredictionService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public PredictionResponse processPrediction(MultipartFile file, String sessionId, boolean explain) throws IOException {
+    public PredictionResponse processPrediction(MultipartFile file, String sessionId, Long userId, boolean explain) throws IOException {
         String imageUrl = imageStorageService.uploadImage(file);
 
         Map<String, Object> predictionResult = mlPredictionService.predictCropDisease(file, explain);
@@ -53,6 +53,7 @@ public class PredictionService {
 
         PredictionHistory history = new PredictionHistory();
         history.setSessionId(sessionId);
+        history.setUserId(userId);
         history.setImageUrl(imageUrl);
         history.setCropName(cropName);
         history.setDiseaseName(readableClass);
@@ -68,14 +69,14 @@ public class PredictionService {
         return PredictionMapper.toResponse(repository.save(history), heatmap);
     }
 
-    public PagedResponse<PredictionResponse> getPredictionHistory(String sessionId, int page, int size) {
+    public PagedResponse<PredictionResponse> getPredictionHistory(String sessionId, Long userId, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "timestamp"));
 
-        Page<PredictionHistory> result = repository.findBySessionIdOrderByTimestampDesc(
-                sessionId,
-                PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "timestamp"))
-        );
+        Page<PredictionHistory> result = (userId != null)
+                ? repository.findByUserIdOrderByTimestampDesc(userId, pageRequest)
+                : repository.findBySessionIdOrderByTimestampDesc(sessionId, pageRequest);
 
         List<PredictionResponse> content = result.getContent().stream()
                 .map(PredictionMapper::toResponse)
@@ -142,3 +143,4 @@ public class PredictionService {
         return Double.parseDouble(value.toString());
     }
 }
+

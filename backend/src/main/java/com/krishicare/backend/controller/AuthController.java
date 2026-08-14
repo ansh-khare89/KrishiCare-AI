@@ -31,4 +31,13 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.refresh(request.refreshToken()));
     }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(jakarta.servlet.http.HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute(com.krishicare.backend.config.JwtAuthFilter.USER_ID_ATTR);
+        if (userId == null) {
+            return ResponseEntity.status(401).body(java.util.Map.of("message", "Unauthorized"));
+        }
+        return ResponseEntity.ok(authService.getProfile(userId));
+    }
 }
