@@ -8,14 +8,16 @@ import { useAuth } from '../context/AuthContext'
 
 function HistoryCard({ item }) {
   const healthy = isHealthy(item.diseaseName)
+  const [imgError, setImgError] = useState(false)
 
   return (
     <article className="overflow-hidden rounded-2xl border border-leaf-200/60 bg-white/80 shadow-sm backdrop-blur-xl transition-shadow hover:shadow-md dark:border-earth-700 dark:bg-earth-900/80">
       <div className="aspect-video overflow-hidden bg-earth-50 dark:bg-earth-800">
-        {item.imageUrl ? (
+        {item.imageUrl && !imgError ? (
           <img
             src={resolveImageUrl(item.imageUrl)}
             alt={item.diseaseName}
+            onError={() => setImgError(true)}
             className="h-full w-full object-cover"
             loading="lazy"
           />

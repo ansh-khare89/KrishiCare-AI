@@ -430,14 +430,14 @@ export default function HomePage() {
       </section>
 
       {loading && <SkeletonResult />}
-      {result && !loading && <PredictionResult result={result} />}
+      {result && !loading && <PredictionResult result={result} fallbackPreview={preview} />}
       {batchResults.length > 0 && !loading && (
         <div className="space-y-6">
           <h2 className="text-xl font-semibold text-earth-900 dark:text-earth-50">
             Batch results ({batchResults.length})
           </h2>
           {batchResults.map((r) => (
-            <PredictionResult key={r.id} result={r} />
+            <PredictionResult key={r.id || r.diseaseName} result={r} />
           ))}
         </div>
       )}

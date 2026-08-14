@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/crop/**").permitAll()
                         .requestMatchers("/api/weather").permitAll()
                         .requestMatchers("/api/ping").permitAll()
+                        .requestMatchers("/uploads/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .headers(h -> h.frameOptions(f -> f.sameOrigin()))
