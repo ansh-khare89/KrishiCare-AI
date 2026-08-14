@@ -20,6 +20,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private com.krishicare.backend.repository.UserRepository userRepository;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
@@ -28,8 +31,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 Claims claims = jwtService.parseToken(header.substring(7));
                 if (jwtService.isAccessToken(claims)) {
-                    request.setAttribute(USER_ID_ATTR, Long.parseLong(claims.getSubject()));
-                    request.setAttribute(USER_EMAIL_ATTR, claims.get("email", String.class));
+                    Long userId = Long.parseLong(claims.getSubject());
+                    if (userRepository.existsById(userId)) {
+                        request.setAttribute(USER_ID_ATTR, userId);
+                        request.setAttribute(USER_EMAIL_ATTR, claims.get("email", String.class));
+                    }
                 }
             } catch (Exception ignored) {
                 // Invalid token — treat as guest

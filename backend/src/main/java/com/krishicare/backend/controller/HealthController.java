@@ -24,14 +24,14 @@ public class HealthController {
         return factory;
     }
 
-    // Fast client for periodic health checks (3s timeout)
+    // Fast client for periodic health checks (10s timeout to allow local TF checks)
     private final RestClient healthClient = RestClient.builder()
-            .requestFactory(createRequestFactory(3000))
+            .requestFactory(createRequestFactory(10000))
             .build();
 
-    // Dedicated client for wake-up pings (15s timeout for cold starts)
+    // Dedicated client for wake-up pings (35s timeout for cold starts and local TF load)
     private final RestClient wakeUpClient = RestClient.builder()
-            .requestFactory(createRequestFactory(15000))
+            .requestFactory(createRequestFactory(35000))
             .build();
 
     @GetMapping("/health")

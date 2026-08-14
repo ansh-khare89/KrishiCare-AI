@@ -148,7 +148,7 @@ export async function fetchCurrentUser() {
 // Wake up backend and ML service by pinging ML wake-up endpoint
 export async function wakeUpService() {
   try {
-    const { data } = await api.get('/api/ml/wakeup', { timeout: 20000 })
+    const { data } = await api.get('/api/ml/wakeup', { timeout: 40000 })
     return data
   } catch (error) {
     console.log('Service wake-up ping failed:', error.message)

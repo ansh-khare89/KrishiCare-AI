@@ -34,6 +34,9 @@ public class PredictionService {
     @Autowired
     private PredictionHistoryRepository repository;
 
+    @Autowired
+    private com.krishicare.backend.repository.UserRepository userRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PredictionResponse processPrediction(MultipartFile file, String sessionId, Long userId, boolean explain) throws IOException {
@@ -51,9 +54,11 @@ public class PredictionService {
         String severity = SeverityEstimator.estimate(rawClass, confidence);
         List<TopPredictionDto> topPredictions = parseTopPredictions(predictionResult.get("top_predictions"));
 
+        Long validUserId = (userId != null && userRepository.existsById(userId)) ? userId : null;
+
         PredictionHistory history = new PredictionHistory();
         history.setSessionId(sessionId);
-        history.setUserId(userId);
+        history.setUserId(validUserId);
         history.setImageUrl(imageUrl);
         history.setCropName(cropName);
         history.setDiseaseName(readableClass);

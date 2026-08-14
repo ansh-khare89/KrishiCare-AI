@@ -42,6 +42,19 @@ def make_readable(class_name: str) -> str:
     return class_name.replace('___', ' — ').replace('_', ' ')
 
 
+def warmup_model():
+    """Perform a dummy prediction to force TensorFlow graph initialization and memory allocation."""
+    global model
+    if model is not None:
+        try:
+            print("Warming up TensorFlow model execution graph...")
+            dummy_img = np.zeros((1, 224, 224, 3), dtype=np.float32)
+            model.predict(dummy_img, verbose=0)
+            print("Model warmup complete! Model is instantly ready for predictions.")
+        except Exception as e:
+            print(f"Model warmup failed: {e}")
+
+
 def load_model_and_classes():
     """Load model and class mapping if not already loaded."""
     global model, class_names, is_efficientnet, model_loading, load_error
@@ -65,6 +78,7 @@ def load_model_and_classes():
                     model_name = getattr(model, 'name', '').lower()
                     is_efficientnet = 'efficient' in model_name
                     print(f"Model '{model.name}' loaded. EfficientNet mode: {is_efficientnet}")
+                    warmup_model()
                     break
                 except Exception as e:
                     print(f"Error loading {model_path}: {e}")
@@ -96,13 +110,27 @@ def preprocess_image(img: Image.Image) -> np.ndarray:
     return np.expand_dims(img_array, axis=0)
 
 
+async def keep_alive_task():
+    """Background task to run a dummy inference periodically to prevent model sleep/cold-start."""
+    while True:
+        if model is not None:
+            try:
+                dummy_img = np.zeros((1, 224, 224, 3), dtype=np.float32)
+                model.predict(dummy_img, verbose=0)
+            except Exception as e:
+                print(f"Keep-alive pulse failed: {e}")
+        await asyncio.sleep(300)  # Pulse every 5 minutes
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Pre-load ML model asynchronously so server binds port 8000 instantly."""
     print(f"Starting ML Service — Model Version: {MODEL_VERSION}")
     loop = asyncio.get_running_loop()
     loop.run_in_executor(None, load_model_and_classes)
+    bg_task = asyncio.create_task(keep_alive_task())
     yield
+    bg_task.cancel()
 
 
 app = FastAPI(
@@ -236,3 +264,8 @@ async def predict(file: UploadFile = File(...), explain: bool = False):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
