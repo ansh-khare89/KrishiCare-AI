@@ -6,8 +6,8 @@ Upload a leaf photo → get disease ID, confidence, top-3 predictions, farming a
 
 ## Live Demo
 
-- Frontend: https://krishi-care-ai.vercel.app/
-- Backend: https://krishicare-ai.onrender.com
+- Frontend: https://krishi-care-ai.vercel.app
+- Backend: https://krishicare-ai.onrender.com/api/health
 - ML Service: https://krishicare-ml.onrender.com
 
 ## Tech Stack
