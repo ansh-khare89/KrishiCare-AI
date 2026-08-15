@@ -3,9 +3,14 @@ KrishiCare - Targeted gap-filler downloader.
 Downloads images only for classes that have fewer than MIN_IMAGES in train/.
 Uses GitHub raw URLs directly — no HuggingFace dependency.
 """
-import argparse, json, os, random, time, urllib.parse, urllib.request
+import argparse, json, os, sys, random, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 MIN_IMAGES   = 150   # download if class has fewer than this in train/
 MAX_PER_CLASS = 300

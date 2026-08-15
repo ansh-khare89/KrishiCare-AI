@@ -1,17 +1,22 @@
 """
-KrishiCare AI - Enhanced Training Script
-=========================================
-Major improvements for accuracy:
-  1. EfficientNetV2B0 backbone (more accurate than MobileNetV2)
-  2. Two-phase training: head warmup → fine-tuning
-  3. EarlyStopping + ReduceLROnPlateau + ModelCheckpoint
-  4. Class weights to handle imbalanced data
-  5. More aggressive data augmentation (cutout, mixup-style)
-  6. Label smoothing for better generalization
-  7. Saves best model by val_accuracy (not last epoch)
+KrishiCare AI - Enhanced Real-World Generalization Model Training Script
+========================================================================
+Designed specifically for high accuracy on real-world, field-condition leaf photos taken by farmers.
+
+Key Accuracy & Generalization Enhancements:
+  1. EfficientNetV2B0 backbone (pretrained on ImageNet)
+  2. Heavy Field-Condition Augmentation Pipeline:
+     - Multi-angle rotations & flips
+     - Color jitter (hue/saturation/brightness) to handle outdoor daylight & shadows
+     - Contrast & translation variations to ignore complex background soil/foliage
+     - Gaussian noise & random scaling
+  3. Two-phase training: Classifier Head Warmup → Top 60 Layers Fine-Tuning
+  4. Class-weight balancing for imbalanced dataset splits
+  5. Label smoothing (0.1) for calibrated confidence & out-of-distribution resilience
 """
 
 import os
+import sys
 import json
 import argparse
 import numpy as np
@@ -20,14 +25,18 @@ import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks, regularizers
 from collections import Counter
 
-# Configuration
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
+# Global Configuration
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
 EPOCHS_WARMUP = 15      # Phase 1: train classifier head only
-EPOCHS_FINETUNE = 20    # Phase 2: fine-tune top layers of backbone
+EPOCHS_FINETUNE = 25    # Phase 2: fine-tune top layers of backbone
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NUM_CLASSES = 38
 
 
 def compute_class_weights(train_dir):
@@ -37,8 +46,8 @@ def compute_class_weights(train_dir):
         cls_path = os.path.join(train_dir, cls)
         if os.path.isdir(cls_path):
             n = len([f for f in os.listdir(cls_path) if f.lower().endswith(
-                ('.jpg', '.jpeg', '.png', '.bmp', '.tiff'))])
-            counts[cls] = max(n, 1)  # avoid division by zero
+                ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'))])
+            counts[cls] = max(n, 1)
 
     total = sum(counts.values())
     n_classes = len(counts)
@@ -48,29 +57,45 @@ def compute_class_weights(train_dir):
     return weights
 
 
+class RandomColorJitter(layers.Layer):
+    """Custom Keras layer to simulate real-world daylight, shadow, and mobile camera color variations."""
+    def __init__(self, brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
+
+    def call(self, inputs, training=None):
+        if not training:
+            return inputs
+        x = inputs
+        if self.brightness > 0:
+            x = tf.image.random_brightness(x, max_delta=self.brightness)
+        if self.contrast > 0:
+            x = tf.image.random_contrast(x, lower=1.0 - self.contrast, upper=1.0 + self.contrast)
+        if self.saturation > 0:
+            x = tf.image.random_saturation(x, lower=1.0 - self.saturation, upper=1.0 + self.saturation)
+        if self.hue > 0:
+            x = tf.image.random_hue(x, max_delta=self.hue)
+        return tf.clip_by_value(x, 0.0, 255.0)
+
+
 def build_model(num_classes, use_efficientnet=True):
     """
-    Build enhanced transfer-learning model.
-
-    Architecture:
-    - EfficientNetV2B0 (default) or MobileNetV2 backbone (pretrained on ImageNet)
-    - Strong data augmentation pipeline
-    - Two Dense layers with BatchNorm + Dropout
-    - Label smoothing in loss
+    Build enhanced transfer-learning model with heavy real-world augmentations.
     """
-    # ── Data augmentation ──────────────────────────────────────────────────
+    # ── Field-Condition Data Augmentation Pipeline ─────────────────────────
     data_augmentation = models.Sequential([
+        RandomColorJitter(brightness=0.25, contrast=0.3, saturation=0.25, hue=0.08),
         layers.RandomFlip("horizontal_and_vertical"),
-        layers.RandomRotation(0.35),
-        layers.RandomZoom(0.25),
-        layers.RandomContrast(0.3),
-        layers.RandomTranslation(0.1, 0.1),
-        layers.RandomBrightness(0.25),
-        # Gaussian noise for robustness
-        layers.GaussianNoise(0.05),
-    ], name="data_augmentation")
+        layers.RandomRotation(0.4),
+        layers.RandomZoom(0.3),
+        layers.RandomTranslation(0.15, 0.15),
+        layers.GaussianNoise(0.08),
+    ], name="real_world_data_augmentation")
 
-    # ── Backbone ────────────────────────────────────────────────────────────
+    # ── Pretrained Backbone ───────────────────────────────────────────────
     if use_efficientnet:
         base_model = tf.keras.applications.EfficientNetV2B0(
             input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3),
@@ -88,38 +113,41 @@ def build_model(num_classes, use_efficientnet=True):
         preprocess_fn = tf.keras.applications.mobilenet_v2.preprocess_input
         backbone_name = "MobileNetV2"
 
-    base_model.trainable = False  # Freeze during warmup phase
-    print(f"Backbone: {backbone_name} with {len(base_model.layers)} layers (frozen)")
+    base_model.trainable = False  # Freeze during Phase 1 Warmup
+    print(f"Backbone: {backbone_name} with {len(base_model.layers)} layers (frozen for warmup)")
 
-    # ── Model graph ─────────────────────────────────────────────────────────
+    # ── Model Graph Construction ──────────────────────────────────────────
     inputs = layers.Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3), name="input_image")
     x = data_augmentation(inputs)
     x = base_model(x, training=False)
 
-    # Classification head
+    # Robust Classification Head with BatchNorm & Heavy Dropout
     x = layers.GlobalAveragePooling2D(name="global_avg_pool")(x)
     x = layers.BatchNormalization(name="bn1")(x)
     x = layers.Dropout(0.4, name="drop1")(x)
+    
     x = layers.Dense(
         512, activation='relu',
         kernel_regularizer=regularizers.l2(1e-4),
         name="fc1"
     )(x)
     x = layers.BatchNormalization(name="bn2")(x)
-    x = layers.Dropout(0.3, name="drop2")(x)
+    x = layers.Dropout(0.35, name="drop2")(x)
+    
     x = layers.Dense(
         256, activation='relu',
         kernel_regularizer=regularizers.l2(1e-4),
         name="fc2"
     )(x)
-    x = layers.Dropout(0.2, name="drop3")(x)
+    x = layers.Dropout(0.25, name="drop3")(x)
+    
     outputs = layers.Dense(num_classes, activation='softmax', name="classifier")(x)
 
     model = models.Model(inputs, outputs, name=f"KrishiCare_{backbone_name}")
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-        # Label smoothing: reduces overconfidence, improves generalization
+        # Label smoothing = 0.1 improves resilience on real outdoor field photos
         loss=tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1),
         metrics=[
             'accuracy',
@@ -130,11 +158,11 @@ def build_model(num_classes, use_efficientnet=True):
 
 
 def get_callbacks(model_path, phase="warmup"):
-    """Get training callbacks for the specified phase."""
+    """Get callbacks for phase 1 and phase 2."""
     return [
         callbacks.EarlyStopping(
             monitor='val_accuracy',
-            patience=6 if phase == "warmup" else 8,
+            patience=7 if phase == "warmup" else 10,
             restore_best_weights=True,
             verbose=1
         ),
@@ -155,7 +183,7 @@ def get_callbacks(model_path, phase="warmup"):
 
 
 def plot_history(history, phase_name, output_dir):
-    """Save training accuracy and loss plots."""
+    """Save clean accuracy and loss plots."""
     acc = history.history.get('accuracy', [])
     val_acc = history.history.get('val_accuracy', [])
     loss = history.history.get('loss', [])
@@ -189,13 +217,10 @@ def plot_history(history, phase_name, output_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train KrishiCare model with 2-phase fine-tuning")
-    parser.add_argument("--quick", action="store_true",
-                        help="Quick mode: reduced epochs for dev testing")
-    parser.add_argument("--no-efficientnet", action="store_true",
-                        help="Use MobileNetV2 instead of EfficientNetV2B0")
-    parser.add_argument("--unfreeze-layers", type=int, default=50,
-                        help="Number of backbone layers to unfreeze in fine-tuning phase (default 50)")
+    parser = argparse.ArgumentParser(description="Train KrishiCare model for real-world photo accuracy")
+    parser.add_argument("--quick", action="store_true", help="Quick mode for testing")
+    parser.add_argument("--no-efficientnet", action="store_true", help="Use MobileNetV2 instead of EfficientNetV2B0")
+    parser.add_argument("--unfreeze-layers", type=int, default=60, help="Backbone layers to unfreeze (default 60)")
     args = parser.parse_args()
 
     global EPOCHS_WARMUP, EPOCHS_FINETUNE, BATCH_SIZE
@@ -203,19 +228,17 @@ def main():
         EPOCHS_WARMUP = 5
         EPOCHS_FINETUNE = 8
         BATCH_SIZE = 16
-        print("⚡ Quick mode: warmup=5 epochs, fine-tune=8 epochs, batch=16")
+        print("⚡ Quick mode enabled: reduced epochs")
 
-    # ── Directories ─────────────────────────────────────────────────────────
     os.chdir(BASE_DIR)
     train_dir = 'dataset/train'
     val_dir   = 'dataset/val'
     test_dir  = 'dataset/test'
-    model_output = 'models/krishicare_mobilenetv2.keras'  # keep filename for compatibility
+    model_output = 'models/krishicare_mobilenetv2.keras'
     models_dir   = 'models'
     os.makedirs(models_dir, exist_ok=True)
 
-    # ── Load datasets ────────────────────────────────────────────────────────
-    print("\n[INFO] Loading datasets...")
+    print("\n[INFO] Loading training, validation, and test datasets...")
     try:
         train_ds_raw = tf.keras.utils.image_dataset_from_directory(
             train_dir, image_size=IMG_SIZE, batch_size=BATCH_SIZE, label_mode='categorical'
@@ -227,7 +250,7 @@ def main():
             test_dir, image_size=IMG_SIZE, batch_size=BATCH_SIZE, label_mode='categorical'
         )
     except ValueError as e:
-        print(f"\n[ERROR] Dataset error: {e}")
+        print(f"\n[ERROR] Dataset loading error: {e}")
         print("Run: python src/download_dataset.py --max-per-class 300")
         return
 
@@ -235,24 +258,17 @@ def main():
     num_classes = len(class_names)
     print(f"[OK] Detected {num_classes} classes")
 
-    # Save class names
     with open('src/class_names.json', 'w') as f:
         json.dump(class_names, f, indent=2)
-    print("Saved class_names.json")
+    print("Saved src/class_names.json")
 
-    # ── Class weights ────────────────────────────────────────────────────────
-    print("\n[INFO] Computing class weights for imbalanced data...")
+    print("\n[INFO] Computing class weights...")
     class_weights = compute_class_weights(train_dir)
-    print(f"   Min weight: {min(class_weights.values()):.3f}  "
-          f"Max weight: {max(class_weights.values()):.3f}")
 
-    # ── Build model ──────────────────────────────────────────────────────────
     use_efficientnet = not args.no_efficientnet
     model, base_model, preprocess_fn = build_model(num_classes, use_efficientnet)
 
-    # ── Preprocess pipelines ─────────────────────────────────────────────────
     AUTOTUNE = tf.data.AUTOTUNE
-
     def preprocess(images, labels):
         images = tf.cast(images, tf.float32)
         images = preprocess_fn(images)
@@ -263,12 +279,11 @@ def main():
     test_ds  = test_ds_raw.map(preprocess, num_parallel_calls=AUTOTUNE).prefetch(AUTOTUNE)
 
     # ════════════════════════════════════════════════════════════════════════
-    # PHASE 1 — Warmup: train only classifier head
+    # PHASE 1 — Classifier Head Warmup
     # ════════════════════════════════════════════════════════════════════════
     print(f"\n{'='*60}")
-    print("PHASE 1 — Warmup (classifier head only)")
+    print("PHASE 1 — Classifier Head Warmup")
     print(f"{'='*60}")
-    model.summary(print_fn=lambda x: None)  # silent summary
 
     history_warmup = model.fit(
         train_ds,
@@ -284,34 +299,34 @@ def main():
     print(f"\n[OK] Phase 1 best val_accuracy: {best_warmup_acc*100:.2f}%")
 
     # ════════════════════════════════════════════════════════════════════════
-    # PHASE 2 — Fine-tuning: unfreeze top N layers of backbone
+    # PHASE 2 — Real-World Fine-Tuning (Unfreeze Top Backbone Layers)
     # ════════════════════════════════════════════════════════════════════════
     print(f"\n{'='*60}")
-    print(f"PHASE 2 — Fine-tuning (unfreezing top {args.unfreeze_layers} backbone layers)")
+    print(f"PHASE 2 — Fine-tuning (Unfreezing top {args.unfreeze_layers} backbone layers)")
     print(f"{'='*60}")
 
-    # Reload best weights from Phase 1
     if os.path.exists(model_output):
-        model = tf.keras.models.load_model(model_output, compile=False)
-        # Re-get base model reference
+        model = tf.keras.models.load_model(
+            model_output,
+            custom_objects={'RandomColorJitter': RandomColorJitter},
+            compile=False
+        )
         for lyr in model.layers:
             if hasattr(lyr, 'layers') and len(lyr.layers) > 5:
                 base_model = lyr
                 break
 
-    # Unfreeze top N layers of backbone
     base_model.trainable = True
     total_layers = len(base_model.layers)
     freeze_until = max(0, total_layers - args.unfreeze_layers)
     for i, layer in enumerate(base_model.layers):
         layer.trainable = (i >= freeze_until)
     trainable_count = sum(1 for l in base_model.layers if l.trainable)
-    print(f"Unfrozen {trainable_count}/{total_layers} backbone layers")
+    print(f"Unfrozen {trainable_count}/{total_layers} backbone layers for real-world fine tuning")
 
-    # Lower LR for fine-tuning to avoid destroying pretrained weights
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=5e-5),
-        loss=tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.05),
+        loss=tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.08),
         metrics=[
             'accuracy',
             tf.keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_acc')
@@ -334,23 +349,34 @@ def main():
     # ════════════════════════════════════════════════════════════════════════
     # EVALUATION
     # ════════════════════════════════════════════════════════════════════════
-    # Load the very best checkpoint
     if os.path.exists(model_output):
-        best_model = tf.keras.models.load_model(model_output, compile=False)
+        best_model = tf.keras.models.load_model(
+            model_output,
+            custom_objects={'RandomColorJitter': RandomColorJitter},
+            compile=False
+        )
         best_model.compile(
             optimizer='adam',
             loss='categorical_crossentropy',
             metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(k=3, name='top3_acc')]
         )
-        print("\n[EVAL] Evaluating best model on test set...")
-        results = best_model.evaluate(test_ds, verbose=1)
-        metrics = dict(zip(best_model.metrics_names, results))
-        print(f"\n[RESULT] Test Accuracy  : {metrics.get('accuracy', 0)*100:.2f}%")
-        print(f"[RESULT] Top-3 Accuracy : {metrics.get('top3_acc', 0)*100:.2f}%")
-        print(f"[RESULT] Test Loss      : {metrics.get('loss', 0):.4f}")
+        print("\n[EVAL] Evaluating final model performance on test set...")
+        eval_res = best_model.evaluate(test_ds, verbose=1)
+        # Handle dict or list return types in Keras
+        if isinstance(eval_res, dict):
+            acc = eval_res.get('accuracy', 0) * 100
+            top3 = eval_res.get('top3_acc', 0) * 100
+            loss_val = eval_res.get('loss', 0)
+        else:
+            loss_val = eval_res[0]
+            acc = eval_res[1] * 100 if len(eval_res) > 1 else 0
+            top3 = eval_res[2] * 100 if len(eval_res) > 2 else 0
 
-    print(f"\n[OK] Training complete! Model saved to: {os.path.abspath(model_output)}")
-    print("Restart the FastAPI service to load the new model.")
+        print(f"\n[RESULT] Test Accuracy  : {acc:.2f}%")
+        print(f"[RESULT] Top-3 Accuracy : {top3:.2f}%")
+        print(f"[RESULT] Test Loss      : {loss_val:.4f}")
+
+    print(f"\n✅ Real-world enhanced model saved to: {os.path.abspath(model_output)}")
 
 
 if __name__ == '__main__':

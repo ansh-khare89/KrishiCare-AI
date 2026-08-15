@@ -13,13 +13,36 @@ def make_readable(class_name):
         return f"{crop} ({disease})"
     return class_name.replace('___', ' - ').replace('_', ' ')
 
+class RandomColorJitter(tf.keras.layers.Layer):
+    """Custom Keras layer for real-world color variation resilience."""
+    def __init__(self, brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, **kwargs):
+        super().__init__(**kwargs)
+
 def main():
-    model_path = 'models/krishicare_mobilenetv2.h5'
+    model_paths = [
+        'models/krishicare_mobilenetv2.keras',
+        'models/krishicare_mobilenetv2.h5',
+        'models/krishicare_mobilenetv2'
+    ]
     class_names_path = 'src/class_names.json'
 
-    # Check for required assets
-    if not os.path.exists(model_path):
-        print(f"Error: Model not found at '{model_path}'.")
+    model = None
+    for mp in model_paths:
+        if os.path.exists(mp):
+            try:
+                print(f"Loading model from '{mp}'...")
+                model = tf.keras.models.load_model(
+                    mp,
+                    custom_objects={'RandomColorJitter': RandomColorJitter},
+                    compile=False
+                )
+                print(f"✓ Model '{mp}' loaded successfully!")
+                break
+            except Exception as e:
+                print(f"Could not load '{mp}': {e}")
+
+    if model is None:
+        print("Error: No trained model found.")
         print("Please train the model first by running: python src/train_model.py")
         return
 
@@ -28,12 +51,9 @@ def main():
         print("Please train the model first to generate it.")
         return
 
-    print("Loading model... (this may take a few seconds)")
-    model = tf.keras.models.load_model(model_path)
-    
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
-    print("Model and class mapping loaded successfully!\n")
+    print("Class mapping loaded successfully!\n")
 
     while True:
         img_path = input("Enter path to test image (or 'q' to quit): ").strip()

@@ -57,6 +57,30 @@ def warmup_model():
             print(f"Model warmup failed: {e}")
 
 
+class RandomColorJitter(tf.keras.layers.Layer):
+    """Custom Keras layer for real-world color variation resilience."""
+    def __init__(self, brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
+
+    def call(self, inputs, training=None):
+        if not training:
+            return inputs
+        x = inputs
+        if self.brightness > 0:
+            x = tf.image.random_brightness(x, max_delta=self.brightness)
+        if self.contrast > 0:
+            x = tf.image.random_contrast(x, lower=1.0 - self.contrast, upper=1.0 + self.contrast)
+        if self.saturation > 0:
+            x = tf.image.random_saturation(x, lower=1.0 - self.saturation, upper=1.0 + self.saturation)
+        if self.hue > 0:
+            x = tf.image.random_hue(x, max_delta=self.hue)
+        return tf.clip_by_value(x, 0.0, 255.0)
+
+
 def load_model_and_classes():
     """Load model and class mapping if not already loaded (thread-safe)."""
     global model, class_names, is_efficientnet, model_loading, load_error
@@ -77,6 +101,7 @@ def load_model_and_classes():
                         print(f"Loading model from {model_path} ...")
                         model = tf.keras.models.load_model(
                             model_path,
+                            custom_objects={'RandomColorJitter': RandomColorJitter},
                             compile=False,
                             safe_mode=False,
                         )
