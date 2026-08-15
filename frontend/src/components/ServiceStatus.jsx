@@ -22,8 +22,9 @@ export default function ServiceStatus() {
     }
 
     check()
-    // Poll more frequently if ML service is loading or unreachable
-    const pollInterval = status?.mlService?.modelLoading ? 5000 : 15000
+    // Poll every 3s if ML service is loading or not ready yet, otherwise every 15s
+    const isMlReady = status?.mlService?.modelLoaded
+    const pollInterval = (!isMlReady || status?.mlService?.modelLoading) ? 3000 : 15000
     const interval = setInterval(check, pollInterval)
 
     const keepAlive = setInterval(async () => {
@@ -37,7 +38,7 @@ export default function ServiceStatus() {
       clearInterval(interval)
       clearInterval(keepAlive)
     }
-  }, [status?.mlService?.modelLoading])
+  }, [status?.mlService?.modelLoaded, status?.mlService?.modelLoading])
 
   const handleWakeUp = async () => {
     setWakingUp(true)

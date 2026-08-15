@@ -5,6 +5,7 @@ import io
 import json
 import time
 import asyncio
+import threading
 import numpy as np
 import tensorflow as tf
 from PIL import Image
@@ -28,6 +29,7 @@ model         = None
 class_names   = None
 model_loading = False
 load_error    = None
+model_lock    = threading.Lock()
 # Track which backbone preprocessing to use
 is_efficientnet = False
 
@@ -56,47 +58,61 @@ def warmup_model():
 
 
 def load_model_and_classes():
-    """Load model and class mapping if not already loaded."""
+    """Load model and class mapping if not already loaded (thread-safe)."""
     global model, class_names, is_efficientnet, model_loading, load_error
     if model is not None and class_names is not None:
         return True
 
-    model_loading = True
-    load_error = None
-    try:
-        print("Loading model and classes...")
-        for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
-            if os.path.exists(model_path):
-                try:
-                    print(f"Loading model from {model_path} ...")
-                    model = tf.keras.models.load_model(
-                        model_path,
-                        compile=False,
-                        safe_mode=False,
-                    )
-                    # Detect backbone type from model name
-                    model_name = getattr(model, 'name', '').lower()
-                    is_efficientnet = 'efficient' in model_name
-                    print(f"Model '{model.name}' loaded. EfficientNet mode: {is_efficientnet}")
-                    warmup_model()
-                    break
-                except Exception as e:
-                    print(f"Error loading {model_path}: {e}")
-                    load_error = str(e)
-                    continue
+    with model_lock:
+        if model is not None and class_names is not None:
+            return True
 
-        if os.path.exists(CLASS_NAMES_PATH):
-            try:
-                with open(CLASS_NAMES_PATH, 'r') as f:
-                    class_names = json.load(f)
-                print(f"Loaded {len(class_names)} class names.")
-            except Exception as e:
-                print(f"Error loading class names: {e}")
-                class_names = None
-    finally:
-        model_loading = False
+        model_loading = True
+        load_error = None
+        try:
+            print("Loading model and classes...")
+            for model_path in [MODEL_PATH_KERAS, MODEL_PATH_H5, MODEL_PATH_SAVED]:
+                if os.path.exists(model_path):
+                    try:
+                        print(f"Loading model from {model_path} ...")
+                        model = tf.keras.models.load_model(
+                            model_path,
+                            compile=False,
+                            safe_mode=False,
+                        )
+                        # Detect backbone type from model name
+                        model_name = getattr(model, 'name', '').lower()
+                        is_efficientnet = 'efficient' in model_name
+                        print(f"Model '{model.name}' loaded. EfficientNet mode: {is_efficientnet}")
+                        warmup_model()
+                        break
+                    except Exception as e:
+                        print(f"Error loading {model_path}: {e}")
+                        load_error = str(e)
+                        continue
+
+            if os.path.exists(CLASS_NAMES_PATH):
+                try:
+                    with open(CLASS_NAMES_PATH, 'r') as f:
+                        class_names = json.load(f)
+                    print(f"Loaded {len(class_names)} class names.")
+                except Exception as e:
+                    print(f"Error loading class names: {e}")
+                    class_names = None
+        finally:
+            model_loading = False
 
     return model is not None and class_names is not None
+
+
+def trigger_async_load() -> bool:
+    """Trigger asynchronous model loading in background thread if not already loaded or loading."""
+    global model, model_loading
+    if model is None and not model_loading:
+        t = threading.Thread(target=load_model_and_classes, daemon=True)
+        t.start()
+        return True
+    return False
 
 
 def preprocess_image(img: Image.Image) -> np.ndarray:
@@ -111,7 +127,7 @@ def preprocess_image(img: Image.Image) -> np.ndarray:
 
 
 async def keep_alive_task():
-    """Background task to run a dummy inference periodically to prevent model sleep/cold-start."""
+    """Background task to run a dummy inference periodically and auto-heal if model unloads."""
     while True:
         if model is not None:
             try:
@@ -119,6 +135,9 @@ async def keep_alive_task():
                 model.predict(dummy_img, verbose=0)
             except Exception as e:
                 print(f"Keep-alive pulse failed: {e}")
+        elif not model_loading:
+            print("Keep-alive detected unloaded model. Auto-triggering model load...")
+            trigger_async_load()
         await asyncio.sleep(300)  # Pulse every 5 minutes
 
 
@@ -126,8 +145,7 @@ async def keep_alive_task():
 async def lifespan(app: FastAPI):
     """Pre-load ML model asynchronously so server binds port 8000 instantly."""
     print(f"Starting ML Service — Model Version: {MODEL_VERSION}")
-    loop = asyncio.get_running_loop()
-    loop.run_in_executor(None, load_model_and_classes)
+    trigger_async_load()
     bg_task = asyncio.create_task(keep_alive_task())
     yield
     bg_task.cancel()
@@ -171,6 +189,28 @@ def ping():
         "status": "pong",
         "service": "KrishiCare AI ML Service",
         "timestamp": str(time.time())
+    }
+
+
+@app.get("/wakeup")
+@app.post("/wakeup")
+def wakeup():
+    """Wake up endpoint to actively trigger asynchronous model loading."""
+    if model is not None:
+        return {
+            "status": "ready",
+            "model_loaded": True,
+            "model_loading": False,
+            "message": "Model is loaded and ready for inference."
+        }
+
+    triggered = trigger_async_load()
+    return {
+        "status": "waking_up",
+        "model_loaded": False,
+        "model_loading": True,
+        "load_triggered": triggered,
+        "message": "ML model wake-up initiated. Loading into memory..."
     }
 
 

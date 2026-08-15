@@ -98,28 +98,65 @@ public class HealthController {
         System.out.println("Initiating wake-up ping to ML Service at: " + mlServiceUrl);
 
         try {
+            // Step 1: Call dedicated /wakeup endpoint to trigger background model load if needed
             @SuppressWarnings("unchecked")
-            Map<String, Object> pingResponse = wakeUpClient.get()
-                    .uri(mlServiceUrl + "/ping")
+            Map<String, Object> wakeupResp = wakeUpClient.get()
+                    .uri(mlServiceUrl + "/wakeup")
                     .retrieve()
                     .body(Map.class);
 
-            if (pingResponse != null && "pong".equals(pingResponse.get("status"))) {
+            if (wakeupResp != null) {
                 wokenUp = true;
                 mlStatus = "healthy";
-
-                @SuppressWarnings("unchecked")
-                Map<String, Object> mlHealth = wakeUpClient.get()
-                        .uri(mlServiceUrl + "/")
-                        .retrieve()
-                        .body(Map.class);
-                if (mlHealth != null) {
-                    modelLoaded = Boolean.TRUE.equals(mlHealth.get("model_loaded"));
-                    modelLoading = Boolean.TRUE.equals(mlHealth.get("model_loading"));
-                }
+                modelLoaded = Boolean.TRUE.equals(wakeupResp.get("model_loaded"));
+                modelLoading = Boolean.TRUE.equals(wakeupResp.get("model_loading"));
             }
         } catch (Exception e) {
-            System.err.println("ML Service Wake-up Ping Failed: " + e.getMessage());
+            System.err.println("ML Service /wakeup endpoint failed, falling back to /ping: " + e.getMessage());
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> pingResponse = wakeUpClient.get()
+                        .uri(mlServiceUrl + "/ping")
+                        .retrieve()
+                        .body(Map.class);
+
+                if (pingResponse != null && "pong".equals(pingResponse.get("status"))) {
+                    wokenUp = true;
+                    mlStatus = "healthy";
+                }
+            } catch (Exception pingEx) {
+                System.err.println("ML Service Ping Failed: " + pingEx.getMessage());
+            }
+        }
+
+        // Step 2: If service is reachable but model is still loading, wait up to 15 seconds for model warmup
+        if (wokenUp && !modelLoaded) {
+            System.out.println("ML Service is waking up. Polling until model loading completes...");
+            int maxPolls = 10;
+            for (int i = 0; i < maxPolls; i++) {
+                try {
+                    Thread.sleep(1500);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> mlHealth = wakeUpClient.get()
+                            .uri(mlServiceUrl + "/")
+                            .retrieve()
+                            .body(Map.class);
+
+                    if (mlHealth != null) {
+                        modelLoaded = Boolean.TRUE.equals(mlHealth.get("model_loaded"));
+                        modelLoading = Boolean.TRUE.equals(mlHealth.get("model_loading"));
+                        if (modelLoaded) {
+                            System.out.println("ML Service model successfully loaded during wake-up polling!");
+                            break;
+                        }
+                    }
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception pollEx) {
+                    System.err.println("Poll attempt " + (i + 1) + " failed: " + pollEx.getMessage());
+                }
+            }
         }
 
         return ResponseEntity.ok(Map.of(
@@ -127,7 +164,7 @@ public class HealthController {
                 "mlStatus", mlStatus,
                 "modelLoaded", modelLoaded,
                 "modelLoading", modelLoading,
-                "message", wokenUp ? (modelLoaded ? "ML Service operational" : "ML Service waking up / loading model") : "Failed to reach ML Service"
+                "message", wokenUp ? (modelLoaded ? "ML Service operational" : "ML Service waking up / loading model into memory") : "Failed to reach ML Service"
         ));
     }
 }
