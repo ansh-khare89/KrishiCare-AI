@@ -23,11 +23,11 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen dark:bg-gradient-to-b dark:from-earth-900 dark:via-earth-900 dark:to-earth-950">
-      <header className="sticky top-0 z-50 border-b border-leaf-200/60 bg-white/90 backdrop-blur-lg shadow-sm dark:border-earth-700 dark:bg-earth-900/90">
+    <div className="min-h-screen bg-gradient-to-b from-earth-50 via-white to-sky-50 dark:from-earth-950 dark:via-earth-900 dark:to-earth-950">
+      <header className="sticky top-0 z-50 border-b border-leaf-200/60 bg-white/80 backdrop-blur-xl shadow-sm dark:border-earth-800/50 dark:bg-earth-950/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-leaf-600 text-white shadow-md shadow-leaf-600/25">
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-leaf-600 to-emerald-600 text-white shadow-lg shadow-leaf-600/30 group-hover:shadow-leaf-600/40 transition-all duration-300">
               <Leaf className="h-5 w-5" />
             </span>
             <div className="text-left">
@@ -37,17 +37,17 @@ export default function Layout() {
           </Link>
 
           <div className="flex items-center gap-2">
-            <nav className="flex items-center gap-1 rounded-xl bg-earth-50 p-1 dark:bg-earth-800">
+            <nav className="flex items-center gap-1 rounded-xl bg-earth-100/80 p-1 dark:bg-earth-900/60 backdrop-blur-sm border border-leaf-200/40 dark:border-earth-800/40">
               {navItems.map(({ to, label, icon: Icon }) => {
                 const active = location.pathname === to
                 return (
                   <Link
                     key={to}
                     to={to}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
                       active
                         ? 'bg-white text-leaf-700 shadow-sm dark:bg-earth-900 dark:text-leaf-300'
-                        : 'text-earth-700 hover:text-leaf-700 dark:text-earth-300'
+                        : 'text-earth-700 hover:text-leaf-700 hover:bg-leaf-50 dark:text-earth-300 dark:hover:text-earth-100 dark:hover:bg-earth-800/50'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -60,7 +60,7 @@ export default function Layout() {
             <button
               type="button"
               onClick={toggle}
-              className="rounded-lg p-2 text-earth-700 hover:bg-earth-100 dark:text-earth-300 dark:hover:bg-earth-800"
+              className="rounded-lg p-2 text-earth-700 hover:bg-earth-100 dark:text-earth-300 dark:hover:bg-earth-800/50 transition-colors hover:scale-105 active:scale-95"
               aria-label="Toggle dark mode"
             >
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -68,12 +68,12 @@ export default function Layout() {
 
             {/* Auth Controls */}
             {isAuthenticated ? (
-              <div className="flex items-center gap-2 border-l border-leaf-200/60 pl-2 dark:border-earth-700">
+              <div className="flex items-center gap-2 border-l border-leaf-200/60 pl-2 dark:border-earth-800">
                 <div
-                  className="flex items-center gap-1.5 rounded-xl bg-leaf-50 px-2.5 py-1.5 text-xs font-semibold text-leaf-800 dark:bg-leaf-950/50 dark:text-leaf-300"
+                  className="flex items-center gap-1.5 rounded-xl bg-leaf-50/80 px-2.5 py-1.5 text-xs font-semibold text-leaf-800 dark:bg-leaf-950/50 dark:text-leaf-300 border border-leaf-200/50 dark:border-earth-800/50 backdrop-blur-sm"
                   title={user?.email}
                 >
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-leaf-600 text-[11px] font-bold text-white uppercase">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-leaf-600 to-emerald-600 text-[11px] font-bold text-white uppercase shadow-sm">
                     {user?.name?.charAt(0) || 'U'}
                   </span>
                   <span className="max-w-[100px] truncate hidden md:inline">{user?.name || user?.email}</span>
@@ -81,7 +81,7 @@ export default function Layout() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-lg p-2 text-earth-600 hover:bg-red-50 hover:text-red-600 dark:text-earth-400 dark:hover:bg-red-950/40 dark:hover:text-red-300 transition-colors"
+                  className="rounded-lg p-2 text-earth-600 hover:bg-red-50 hover:text-red-600 dark:text-earth-400 dark:hover:bg-red-950/40 dark:hover:text-red-300 transition-all hover:scale-105 active:scale-95"
                   title="Sign out"
                 >
                   <LogOut className="h-4 w-4" />
@@ -90,7 +90,7 @@ export default function Layout() {
             ) : (
               <Link
                 to="/auth"
-                className="flex items-center gap-1.5 rounded-xl bg-leaf-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm shadow-leaf-600/25 transition-all hover:bg-leaf-700 active:scale-95"
+                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-leaf-600 to-emerald-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-lg shadow-leaf-600/30 transition-all hover:from-leaf-700 hover:to-emerald-700 hover:shadow-leaf-600/40 active:scale-95"
               >
                 <LogIn className="h-4 w-4" />
                 <span>Sign In</span>
@@ -107,7 +107,7 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-leaf-100 py-6 text-center text-sm text-earth-700/60 dark:border-earth-800 dark:text-earth-500">
+      <footer className="border-t border-leaf-200/60 py-6 text-center text-sm text-earth-700/60 dark:border-earth-800 dark:text-earth-500">
         © {new Date().getFullYear()} KrishiCare — AI-powered crop disease detection for 30+ crops
       </footer>
     </div>
