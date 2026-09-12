@@ -24,13 +24,18 @@ public class AuthService {
     private JwtService jwtService;
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.email().toLowerCase())) {
+        String cleanEmail = request.email() != null ? request.email().trim().toLowerCase() : "";
+        String cleanName = request.name() != null ? request.name().trim() : "";
+        if (cleanEmail.isEmpty() || request.password() == null || request.password().isBlank()) {
+            throw new IllegalArgumentException("Email and password cannot be blank.");
+        }
+        if (userRepository.existsByEmail(cleanEmail)) {
             throw new IllegalStateException("Email already registered.");
         }
 
         User user = new User();
-        user.setName(request.name());
-        user.setEmail(request.email().toLowerCase());
+        user.setName(cleanName);
+        user.setEmail(cleanEmail);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setCreatedAt(LocalDateTime.now());
         userRepository.save(user);
@@ -39,7 +44,8 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email().toLowerCase())
+        String cleanEmail = request.email() != null ? request.email().trim().toLowerCase() : "";
+        User user = userRepository.findByEmail(cleanEmail)
                 .orElseThrow(() -> new IllegalStateException("Invalid email or password."));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -48,6 +54,7 @@ public class AuthService {
 
         return tokensFor(user);
     }
+
 
     public AuthResponse refresh(String refreshToken) {
         Claims claims = jwtService.parseToken(refreshToken);

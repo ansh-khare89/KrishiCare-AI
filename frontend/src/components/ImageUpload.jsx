@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
-import { Upload, ImageIcon, X, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Upload, ImageIcon, X, Check, AlertCircle, Loader2, Camera, Clipboard, Sparkles } from 'lucide-react'
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
 const MAX_SIZE_MB = 10
@@ -9,6 +9,8 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
   const [error, setError] = useState('')
   const [selectedFileName, setSelectedFileName] = useState('')
   const inputRef = useRef(null)
+  const cameraInputRef = useRef(null)
+  const containerRef = useRef(null)
 
   const validate = useCallback((selected) => {
     if (!ACCEPTED_TYPES.includes(selected.type)) {
@@ -36,12 +38,35 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
     (e) => {
       e.preventDefault()
       setDragOver(false)
-      if (disabled) return
+      if (disabled || analyzing) return
       const dropped = e.dataTransfer.files?.[0]
       handleFile(dropped)
     },
-    [disabled, handleFile],
+    [disabled, analyzing, handleFile],
   )
+
+  // Global & Container Paste Listener (Ctrl+V)
+  useEffect(() => {
+    const handlePaste = (e) => {
+      if (disabled || analyzing) return
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const pastedBlob = items[i].getAsFile()
+          if (pastedBlob) {
+            const pastedFile = new File([pastedBlob], `pasted_leaf_${Date.now()}.png`, { type: pastedBlob.type })
+            handleFile(pastedFile)
+            break
+          }
+        }
+      }
+    }
+
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  }, [disabled, analyzing, handleFile])
 
   const clearFile = () => {
     setSelectedFileName('')
@@ -50,54 +75,61 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
 
   if (preview) {
     return (
-      <div className="relative overflow-hidden rounded-2xl border border-border-primary bg-surface-card shadow-sm dark:border-border-primary dark:bg-surface-elevated group">
-        <img 
-          src={preview} 
-          alt="Selected leaf" 
-          className="max-h-80 w-full object-contain bg-surface-elevated dark:bg-surface-card transition-transform duration-300 group-hover:scale-[1.01]"
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-md dark:border-slate-800 group">
+        <img
+          src={preview}
+          alt="Selected leaf"
+          className="max-h-96 w-full object-contain bg-slate-950/80 transition-transform duration-300 group-hover:scale-[1.01]"
         />
-        
-        {/* Top overlay with crop info */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
-        
+
+        {/* Top Overlay Controls */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+
         {!disabled && !analyzing && (
           <button
             type="button"
             onClick={clearFile}
-            className="absolute right-3 top-3 z-10 rounded-full bg-surface-card/90 p-2 text-text-secondary shadow-lg backdrop-blur-sm transition-all hover:bg-red-500/90 hover:text-white hover:scale-110 dark:bg-surface-elevated/90 dark:text-text-muted"
+            className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-slate-900/80 p-2 text-white shadow-lg backdrop-blur-md transition-all hover:bg-red-600 hover:scale-110 active:scale-95 cursor-pointer"
             aria-label="Remove image"
+            title="Remove image"
           >
             <X className="h-4 w-4" />
           </button>
         )}
-        
+
         {analyzing && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10">
-            <div className="flex flex-col items-center gap-3 text-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/65 backdrop-blur-sm z-10">
+            <div className="flex flex-col items-center gap-3 text-white text-center px-4">
               <div className="relative">
-                <Loader2 className="h-10 w-10 animate-spin text-leaf-400" />
-                <div className="absolute inset-0 rounded-full bg-leaf-500/30 animate-ping" />
+                <Loader2 className="h-12 w-12 animate-spin text-emerald-400" />
+                <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
               </div>
-              <p className="font-medium">Analyzing leaf...</p>
-              <p className="text-sm text-white/70">AI is examining the image</p>
+              <p className="font-bold text-base tracking-tight">AI Neural Diagnosis in Progress</p>
+              <p className="text-xs text-emerald-200">Evaluating 38 disease patterns with EfficientNet / MobileNet</p>
             </div>
           </div>
         )}
-        
-        {/* File name badge */}
-        <div className="absolute bottom-3 left-3 right-3 px-3 py-2 bg-black/60 backdrop-blur-sm rounded-xl text-white/90 text-sm font-medium truncate">
-          {selectedFileName || file?.name || 'Selected image'}
+
+        {/* File name & quick info badge */}
+        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-3.5 py-2 bg-black/70 backdrop-blur-md rounded-xl text-white/90 text-xs font-semibold">
+          <div className="flex items-center gap-2 truncate">
+            <ImageIcon className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span className="truncate">{selectedFileName || file?.name || 'Selected leaf image'}</span>
+          </div>
+          <span className="shrink-0 text-[10px] text-emerald-300 font-bold uppercase bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/60">
+            Image Ready
+          </span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full" ref={containerRef}>
       <div
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && inputRef.current?.click()}
         onClick={() => !disabled && !analyzing && inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault()
@@ -105,75 +137,73 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        className={`relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-14 transition-all duration-300 ${
+        className={`relative flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed px-6 py-12 transition-all duration-300 ${
           dragOver
-            ? 'border-leaf-500 bg-gradient-to-br from-leaf-500/10 to-emerald-500/10 dark:from-leaf-900/20 dark:to-emerald-900/20'
-            : 'border-border-primary bg-surface-card/50 hover:border-leaf-500/50 hover:bg-leaf-500/5 dark:hover:border-leaf-500/30 dark:bg-surface-elevated/30 dark:hover:bg-leaf-500/10'
+            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 scale-[1.01]'
+            : 'border-slate-300/80 bg-white/70 hover:border-emerald-500/60 hover:bg-emerald-50/30 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-emerald-500/40 dark:hover:bg-slate-900/70'
         } ${disabled || analyzing ? 'pointer-events-none opacity-60' : ''}`}
       >
-        {/* Animated background elements */}
-        <div className="absolute inset-0 -z-10 overflow-hidden rounded-2xl">
-          <div className="absolute -top-1/2 -right-1/2 h-[80%] w-[80%] rounded-full bg-leaf-500/10 blur-3xl animate-pulse-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        {/* Animated Glow Spot */}
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+          <div className="absolute -top-1/2 -right-1/2 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
         </div>
 
-        {/* Upload Icon Area */}
-        <div className="relative mb-4 flex h-20 w-20 items-center justify-center rounded-2xl transition-all duration-300 group-hover:scale-110">
-          {dragOver ? (
-            <>
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-leaf-500 to-emerald-500 animate-ping opacity-75" />
-              <div className="relative flex h-full w-full items-center justify-center rounded-2xl bg-gradient-to-br from-leaf-500 to-emerald-500 text-white shadow-xl shadow-leaf-500/30">
-                <ImageIcon className="h-10 w-10" />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-leaf-500/20 to-emerald-500/20" />
-              <div className="relative flex h-full w-full items-center justify-center rounded-2xl bg-gradient-to-br from-leaf-100 to-emerald-100 text-leaf-600 shadow-lg dark:from-leaf-900/50 dark:to-emerald-900/30 dark:text-leaf-400">
-                <Upload className="h-10 w-10" />
-              </div>
-            </>
-          )}
+        {/* Upload Icon */}
+        <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-100 to-teal-50 text-emerald-600 shadow-sm dark:from-emerald-950/60 dark:to-slate-800 dark:text-emerald-400 group-hover:scale-105 transition-transform">
+          <Upload className="h-8 w-8" />
         </div>
 
-        {/* Main Text */}
-        <div className="text-center">
-          <p className="text-lg font-semibold text-text-primary dark:text-text-primary">
-            {dragOver ? 'Drop your leaf image here' : 'Upload a leaf photo'}
+        {/* Primary Instructions */}
+        <div className="text-center max-w-sm">
+          <p className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+            {dragOver ? 'Drop leaf image now' : 'Upload or drop leaf photo'}
           </p>
-          <p className="mt-2 text-sm text-text-secondary dark:text-text-muted max-w-xs">
-            Drag & drop or click to browse — JPEG, PNG, WebP up to {MAX_SIZE_MB} MB
+          <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+            Drag & drop, browse files, or press <kbd className="rounded bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 text-[11px] font-mono font-bold text-slate-800 dark:text-slate-200">Ctrl+V</kbd> to paste from clipboard
           </p>
         </div>
 
-        {/* Supported formats badges */}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+        {/* Secondary Action Buttons (Camera & File) */}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              inputRef.current?.click()
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-all active:scale-95 cursor-pointer"
+          >
+            <ImageIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Browse Files</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              cameraInputRef.current?.click()
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-all active:scale-95 cursor-pointer"
+          >
+            <Camera className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Use Camera</span>
+          </button>
+        </div>
+
+        {/* Format Badges */}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {ACCEPTED_TYPES.map((type) => (
             <span
               key={type}
-              className="inline-flex items-center gap-1.5 rounded-full bg-surface-elevated/50 px-2.5 py-1 text-xs font-medium text-text-muted border border-border-primary/50 dark:bg-surface-card/50 dark:border-border-primary/50"
+              className="inline-flex items-center rounded-lg bg-slate-100/80 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800/80 dark:text-slate-400 border border-slate-200/60 dark:border-slate-800"
             >
-              <ImageIcon className="h-3 w-3" />
               {type.split('/')[1].toUpperCase()}
             </span>
           ))}
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">up to 10MB</span>
         </div>
 
-        {/* Features hints */}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-text-muted">
-          <span className="flex items-center gap-1.5">
-            <Check className="h-3.5 w-3.5 text-leaf-500" />
-            AI-powered analysis
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Check className="h-3.5 w-3.5 text-leaf-500" />
-            Instant results
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Check className="h-3.5 w-3.5 text-leaf-500" />
-            Treatment recommendations
-          </span>
-        </div>
-
+        {/* Hidden Inputs */}
         <input
           ref={inputRef}
           type="file"
@@ -182,50 +212,21 @@ export default function ImageUpload({ file, preview, onFileSelect, onClear, disa
           disabled={disabled || analyzing}
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          disabled={disabled || analyzing}
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
       </div>
 
       {error && (
-        <div className="mt-3 flex items-center gap-2 rounded-xl bg-red-50/80 px-4 py-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300 border border-red-200/50 dark:border-red-900/30 animate-slide-down">
-          <div className="relative flex items-center justify-center">
-            <AlertCircle className="h-5 w-5 shrink-0" />
-            <span className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />
-          </div>
-          {error}
-        </div>
-      )}
-
-      {selectedFileName && !preview && !analyzing && (
-        <div className="mt-3 flex items-center gap-2 rounded-xl bg-leaf-50/80 px-4 py-3 text-sm text-leaf-800 dark:bg-leaf-950/30 dark:text-leaf-400 border border-leaf-200/50 dark:border-leaf-900/30 animate-slide-down">
-          <div className="relative flex items-center justify-center">
-            <Check className="h-5 w-5 text-leaf-600 dark:text-leaf-400" />
-            <span className="absolute inset-0 rounded-full bg-leaf-500/20 animate-ping" />
-          </div>
-          <span className="font-medium">Selected:</span>
-          <span className="truncate max-w-xs">{selectedFileName}</span>
-          <button
-            type="button"
-            onClick={clearFile}
-            className="ml-auto rounded-lg p-1 text-leaf-600 hover:bg-leaf-100 dark:hover:bg-leaf-900/30 transition-colors"
-            aria-label="Remove file"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {analyzing && !preview && (
-        <div className="mt-4 flex flex-col items-center gap-3 rounded-2xl bg-gradient-to-br from-leaf-50 to-emerald-50 p-6 dark:from-leaf-950/30 dark:to-emerald-950/20 border border-leaf-200/50 dark:border-leaf-900/30 animate-fade-in">
-          <div className="relative">
-            <Loader2 className="h-12 w-12 animate-spin text-leaf-500" />
-            <div className="absolute inset-0 rounded-full bg-leaf-500/30 animate-ping" />
-          </div>
-          <div className="text-center">
-            <p className="font-semibold text-text-primary dark:text-text-primary">Analyzing your leaf...</p>
-            <p className="text-sm text-text-secondary dark:text-text-muted">Our AI is examining the image for diseases</p>
-          </div>
-          <div className="w-full max-w-md h-2 bg-surface-elevated rounded-full overflow-hidden dark:bg-surface-card">
-            <div className="h-full bg-gradient-to-r from-leaf-500 to-emerald-500 rounded-full animate-pulse" />
-          </div>
+        <div className="mt-3 flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900/50 animate-slide-down">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+          <span>{error}</span>
         </div>
       )}
     </div>

@@ -286,13 +286,17 @@ def run_inference(img_batch, explain: bool = False) -> dict:
 
     if explain:
         try:
-            from src.gradcam import generate_gradcam_overlay
+            try:
+                from src.gradcam import generate_gradcam_overlay
+            except ImportError:
+                from gradcam import generate_gradcam_overlay
             idx     = int(top_indices[0])
             heatmap = generate_gradcam_overlay(model, img_batch, idx)
             if heatmap:
                 result["heatmap_base64"] = heatmap
         except Exception as e:
             result["gradcam_error"] = str(e)
+
 
     return result
 

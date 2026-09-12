@@ -1,6 +1,7 @@
 package com.krishicare.backend.service;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import java.util.LinkedHashMap;
@@ -12,7 +13,14 @@ public class WeatherService {
     @Value("${weather.api.key:}")
     private String apiKey;
 
-    private final RestClient restClient = RestClient.builder().build();
+    private final RestClient restClient;
+
+    public WeatherService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(5000);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
+    }
 
     public Map<String, Object> getWeatherData(String city) {
         if (city == null || city.isBlank()) {
