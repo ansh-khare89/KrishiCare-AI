@@ -193,7 +193,9 @@ app.add_middleware(
 
 
 @app.get("/")
+@app.head("/")
 @app.get("/health")
+@app.head("/health")
 def health_check():
     return {
         "status": "healthy",
@@ -208,13 +210,15 @@ def health_check():
 
 
 @app.get("/ping")
+@app.head("/ping")
 def ping():
-    """Lightweight keep-alive endpoint."""
+    """Lightweight keep-alive endpoint for uptime monitors."""
     return {
         "status": "pong",
         "service": "KrishiCare AI ML Service",
         "timestamp": str(time.time())
     }
+
 
 
 @app.get("/wakeup")

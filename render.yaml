@@ -5,6 +5,7 @@ services:
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
     plan: free
+    healthCheckPath: /api/ping
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
@@ -33,9 +34,11 @@ services:
     dockerfilePath: ml-service/Dockerfile
     dockerContext: ml-service
     plan: free
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
+
 
 databases:
   - name: krishicare-db
